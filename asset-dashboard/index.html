@@ -53,6 +53,7 @@ const uid=()=>Math.random().toString(36).slice(2,9);
 const CAP=!!(window.claude&&window.claude.use); // 캡처 읽기(Claude 환경 전용) 사용 가능 여부
 const ld=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}; // 기기 기준 오늘 날짜(한국 시간)
 const lm=()=>ld().slice(0,7);
+const fd=iso=>{const d=new Date(iso);return isNaN(d.getTime())?'날짜 없음':d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 const E=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 let LAST={net:0,val:0,cost:0},XC='';
 let S;try{S=JSON.parse(localStorage.getItem('assetdash2'))}catch(e){}
@@ -94,12 +95,12 @@ function exp(){const o={v:1,accounts:S.accounts.filter(f),others:S.others.filter
 function imp(){const t=document.getElementById('xi').value.trim();if(!t)return;let o;try{o=JSON.parse(decodeURIComponent(escape(atob(t))))}catch(e){alert('코드를 읽지 못했어요. 전체를 정확히 붙여넣었는지 확인해 주세요.');return}
 if(!o||!Array.isArray(o.accounts)){alert('올바른 코드가 아니에요.');return}
 const who=prompt('가져올 계좌의 소유자 이름을 적어 주세요 (예: 배우자)','배우자');if(!who)return;
-const cl=x=>String(x==null?'':x).replace(/[<>"&]/g,'');
+const cl=x=>String(x==null?'':x).replace(/[<>"]/g,'');
 o.accounts.forEach(a=>{if(!a||!Array.isArray(a.holdings))return;const acc={id:cl(a.id)||uid(),name:cl(a.name),type:TY.includes(a.type)?a.type:'일반',owner:cl(who),asof:cl(a.asof),holdings:a.holdings.map(h=>({name:cl(h.name),cur:h.cur==='USD'?'USD':'KRW',qty:+h.qty||0,avg:+h.avg||0,price:+h.price||0,yld:+h.yld||0,freq:[12,4,2,1].includes(+h.freq)?+h.freq:12,auto:+h.auto||0,day:+h.day||10,ovr:h.ovr==null?null:+h.ovr}))};const i=S.accounts.findIndex(x=>x.id===acc.id);if(i>=0)S.accounts[i]=acc;else S.accounts.push(acc)});
 (Array.isArray(o.others)?o.others:[]).forEach(x=>{if(!x)return;const it={id:cl(x.id)||uid(),owner:cl(who),name:cl(x.name),amt:+x.amt||0,type:x.type==='부채'?'부채':'자산'};const i=S.others.findIndex(z=>z.id===it.id);if(i>=0)S.others[i]=it;else S.others.push(it)});
 save();render()}
 // ---- .json 파일 백업 / 불러오기 ----
-function clean(d){const cl=x=>String(x==null?'':x).replace(/[<>"&]/g,'');const A=(Array.isArray(d.accounts)?d.accounts:[]).filter(a=>a&&Array.isArray(a.holdings)).map(a=>({id:cl(a.id)||uid(),name:cl(a.name)||'계좌',type:TY.includes(a.type)?a.type:'일반',owner:cl(a.owner)||'나',asof:/^\d{4}-\d{2}-\d{2}$/.test(a.asof||'')?a.asof:undefined,holdings:a.holdings.filter(h=>h).map(h=>({name:cl(h.name)||'종목',cur:h.cur==='USD'?'USD':'KRW',qty:+h.qty||0,avg:+h.avg||0,price:+h.price||0,yld:+h.yld||0,freq:[12,4,2,1].includes(+h.freq)?+h.freq:12,auto:+h.auto||0,day:+h.day||10,ovr:(h.ovr==null||h.ovr==='')?null:(+h.ovr||0)}))}));
+function clean(d){const cl=x=>String(x==null?'':x).replace(/[<>"]/g,'');const A=(Array.isArray(d.accounts)?d.accounts:[]).filter(a=>a&&Array.isArray(a.holdings)).map(a=>({id:cl(a.id)||uid(),name:cl(a.name)||'계좌',type:TY.includes(a.type)?a.type:'일반',owner:cl(a.owner)||'나',asof:/^\d{4}-\d{2}-\d{2}$/.test(a.asof||'')?a.asof:undefined,holdings:a.holdings.filter(h=>h).map(h=>({name:cl(h.name)||'종목',cur:h.cur==='USD'?'USD':'KRW',qty:+h.qty||0,avg:+h.avg||0,price:+h.price||0,yld:+h.yld||0,freq:[12,4,2,1].includes(+h.freq)?+h.freq:12,auto:+h.auto||0,day:+h.day||10,ovr:(h.ovr==null||h.ovr==='')?null:(+h.ovr||0)}))}));
 const B=(Array.isArray(d.others)?d.others:[]).filter(x=>x).map(x=>({id:cl(x.id)||uid(),owner:cl(x.owner)||'나',name:cl(x.name)||'항목',amt:+x.amt||0,type:x.type==='부채'?'부채':'자산'}));
 const H=(Array.isArray(d.hist)?d.hist:[]).filter(h=>h&&/^\d{4}-\d{2}$/.test(h.m||'')).map(h=>({o:cl(h.o),m:h.m,net:+h.net||0,val:+h.val||0,cost:+h.cost||0}));
 const s=d.sim||{};return{owner:cl(d.owner)||'전체',goal:+d.goal||0,fx:+d.fx||1400,view:d.view==='all'?'all':'acc',accounts:A,others:B,hist:H,sim:{monthly:+s.monthly||0,g:+s.g||0,y:+s.y||0,years:+s.years||20,reinvest:s.reinvest?1:0}}}
@@ -109,7 +110,7 @@ fi.onchange=()=>{const f=fi.files[0];if(!f){fi.remove();return}if(f.size>4e6){al
 rd.onerror=()=>alert('파일을 읽지 못했어요. 다시 시도해 주세요.');
 rd.onload=()=>{let o;try{o=JSON.parse(String(rd.result).replace(/^\uFEFF/,''))}catch(e){alert('JSON 파일을 읽지 못했어요. 백업할 때 받은 파일 그대로인지 확인해 주세요.');return}
 const d=o&&o.data?o.data:o;if(!d||!Array.isArray(d.accounts)||!Array.isArray(d.others)){alert('자산 대시보드 백업 파일이 아니에요.');return}
-const when=o&&o.savedAt?String(o.savedAt).slice(0,10):'날짜 없음';
+const when=o&&o.savedAt?fd(o.savedAt):'날짜 없음';
 if(!confirm('백업 파일('+when+')의 내용으로 지금 데이터를 바꿀까요?\n계좌 '+d.accounts.length+'개 · 기타 항목 '+d.others.length+'개 · 월별 기록 '+(Array.isArray(d.hist)?d.hist.length:0)+'건\n지금 기기에 있던 내용은 사라집니다.'))return;
 S=clean(d);fix();save();XC='';render();alert('백업 파일을 불러왔어요.')};
 rd.readAsText(f,'utf-8');fi.remove()};
