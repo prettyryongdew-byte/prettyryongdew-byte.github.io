@@ -1013,9 +1013,9 @@
       } else if (soundMode === 'vibrate') {
         const vibrated = vibrateOnce(ALARM_VIBRATION);
         if (!vibrated) {
-          updateStatus('finished', '시간 종료! 이 브라우저에서는 진동을 지원하지 않아 무소음으로 알려드려요');
+          updateStatus('finished', '시간 종료 · 진동 미지원(무소음)');
         } else {
-          updateStatus('finished', '시간 종료! 진동으로 알려드리는 중이에요');
+          updateStatus('finished', '시간 종료 · 진동 알림');
         }
         alarmIntervalId = setInterval(() => {
           if (isAlarmActive && soundMode === 'vibrate') {
