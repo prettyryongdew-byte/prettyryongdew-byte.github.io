@@ -51,6 +51,8 @@ const clone=o=>JSON.parse(JSON.stringify(o));
 const BLANK={owner:'전체',goal:0,fx:1400,view:'acc',accounts:[],others:[],hist:[],sim:{monthly:0,g:5,y:3.5,years:20,reinvest:1}};
 const uid=()=>Math.random().toString(36).slice(2,9);
 const CAP=!!(window.claude&&window.claude.use); // 캡처 읽기(Claude 환경 전용) 사용 가능 여부
+const ld=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}; // 기기 기준 오늘 날짜(한국 시간)
+const lm=()=>ld().slice(0,7);
 const E=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
 let LAST={net:0,val:0,cost:0},XC='';
 let S;try{S=JSON.parse(localStorage.getItem('assetdash2'))}catch(e){}
@@ -85,9 +87,9 @@ if(!L.length){alert('종목을 읽지 못했어요. 더 선명한 캡처로 다�
 if(!confirm(L.map(x=>`${x.name} ${x.qty}주 · 평균 ${x.avg} · 현재 ${x.price}`).join('\n')+'\n\n읽은 값이 맞나요? 반영하면 같은 이름 종목은 덮어씁니다.'))return;
 const A=S.accounts[ai];L.forEach(x=>{const c=x.cur==='USD'?'USD':'KRW',h=A.holdings.find(z=>z.name.trim().toUpperCase()===String(x.name).trim().toUpperCase());
 if(h){h.qty=+x.qty||0;if(+x.avg)h.avg=+x.avg;if(+x.price)h.price=+x.price;h.cur=c}else A.holdings.push({name:String(x.name),cur:c,qty:+x.qty||0,avg:+x.avg||0,price:+x.price||0,yld:0,freq:12,auto:0,day:10,ovr:null})});
-A.asof=new Date().toISOString().slice(0,10);save();render()}catch(e){alert(e&&e.code==='not_granted'?'캡처 읽기 사용이 허용되지 않았어요.':'읽는 중 문제가 생겼어요. 잠시 뒤 다시 시도해 주세요.')}};
+A.asof=ld();save();render()}catch(e){alert(e&&e.code==='not_granted'?'캡처 읽기 사용이 허용되지 않았어요.':'읽는 중 문제가 생겼어요. 잠시 뒤 다시 시도해 주세요.')}};
 fi.click()}
-function rec(){const m=new Date().toISOString().slice(0,7);S.hist=S.hist.filter(h=>!(h.o===S.owner&&h.m===m));S.hist.push({o:S.owner,m,net:LAST.net,val:LAST.val,cost:LAST.cost});save();render()}
+function rec(){const m=lm();S.hist=S.hist.filter(h=>!(h.o===S.owner&&h.m===m));S.hist.push({o:S.owner,m,net:LAST.net,val:LAST.val,cost:LAST.cost});save();render()}
 function exp(){const o={v:1,accounts:S.accounts.filter(f),others:S.others.filter(f)};XC=btoa(unescape(encodeURIComponent(JSON.stringify(o))));render();setTimeout(()=>{const t=document.getElementById('xc');if(t)t.select();try{navigator.clipboard.writeText(XC)}catch(e){}},0)}
 function imp(){const t=document.getElementById('xi').value.trim();if(!t)return;let o;try{o=JSON.parse(decodeURIComponent(escape(atob(t))))}catch(e){alert('코드를 읽지 못했어요. 전체를 정확히 붙여넣었는지 확인해 주세요.');return}
 if(!o||!Array.isArray(o.accounts)){alert('올바른 코드가 아니에요.');return}
@@ -101,7 +103,7 @@ function clean(d){const cl=x=>String(x==null?'':x).replace(/[<>"&]/g,'');const A
 const B=(Array.isArray(d.others)?d.others:[]).filter(x=>x).map(x=>({id:cl(x.id)||uid(),owner:cl(x.owner)||'나',name:cl(x.name)||'항목',amt:+x.amt||0,type:x.type==='부채'?'부채':'자산'}));
 const H=(Array.isArray(d.hist)?d.hist:[]).filter(h=>h&&/^\d{4}-\d{2}$/.test(h.m||'')).map(h=>({o:cl(h.o),m:h.m,net:+h.net||0,val:+h.val||0,cost:+h.cost||0}));
 const s=d.sim||{};return{owner:cl(d.owner)||'전체',goal:+d.goal||0,fx:+d.fx||1400,view:d.view==='all'?'all':'acc',accounts:A,others:B,hist:H,sim:{monthly:+s.monthly||0,g:+s.g||0,y:+s.y||0,years:+s.years||20,reinvest:s.reinvest?1:0}}}
-function expJSON(){const o={app:'asset-dashboard',v:2,savedAt:new Date().toISOString(),data:S};const b=new Blob([JSON.stringify(o,null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='자산대시보드-백업-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}
+function expJSON(){const o={app:'asset-dashboard',v:2,savedAt:new Date().toISOString(),data:S};const b=new Blob([JSON.stringify(o,null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='자산대시보드-백업-'+ld()+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}
 function impJSON(){const fi=document.createElement('input');fi.type='file';fi.accept='.json,application/json';
 fi.onchange=()=>{const f=fi.files[0];if(!f)return;if(f.size>4e6){alert('파일이 너무 커요(4MB 초과). 자산 대시보드 백업 파일이 맞는지 확인해 주세요.');return}const rd=new FileReader();
 rd.onerror=()=>alert('파일을 읽지 못했어요. 다시 시도해 주세요.');
@@ -115,7 +117,7 @@ fi.click()}
 function reset(){if(confirm('예시 데이터로 되돌릴까요? 입력한 내용이 사라집니다.')){S=clone(SAMPLE);fix();save();render()}}
 function apply(ai){if(!confirm('다음 자동매수분을 보유 수량과 평균매수가에 반영할까요?'))return;S.accounts[ai].holdings.forEach(h=>{const n=ns(h);if(n>0){h.avg=(h.avg*h.qty+n*h.price)/(h.qty+n);h.qty+=n}h.ovr=null});save();render()}
 const ns=h=>h.ovr!=null?h.ovr:(h.price>0?Math.floor((h.auto||0)/(h.price*X(h))):0);
-document.addEventListener('change',e=>{const t=e.target,p=t.dataset.p;if(!p)return;const[o,k]=walk(p);o[k]=t.dataset.s?t.value:(t.value===''&&k==='ovr'?null:Number(t.value)||0);const am=p.match(/^accounts\.(\d+)\.holdings\./);if(am)S.accounts[am[1]].asof=new Date().toISOString().slice(0,10);save();render()});
+document.addEventListener('change',e=>{const t=e.target,p=t.dataset.p;if(!p)return;const[o,k]=walk(p);o[k]=t.dataset.s?t.value:(t.value===''&&k==='ovr'?null:Number(t.value)||0);const am=p.match(/^accounts\.(\d+)\.holdings\./);if(am)S.accounts[am[1]].asof=ld();save();render()});
 function render(){
 if(!ow().includes(S.owner))S.owner='전체';
 const now=new Date(),mo=now.getMonth()+1,td=now.getDate();
