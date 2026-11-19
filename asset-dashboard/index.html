@@ -1,0 +1,178 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>우리가족 자산 대시보드</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef2ef;--card:#fff;--tx:#18241d;--mu:#68756d;--ac:#1f7a4d;--ac2:#e3f1e8;--bd:#dde4df;--up:#d6453d;--dn:#3b6fd4;--gd:#b9821c;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1512;--card:#18211c;--tx:#e8efe9;--mu:#92a198;--ac:#4cc084;--ac2:#1d3228;--bd:#2a3730;--up:#ff7a70;--dn:#7ea6ff;--gd:#e4b04c;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f1512;--card:#18211c;--tx:#e8efe9;--mu:#92a198;--ac:#4cc084;--ac2:#1d3228;--bd:#2a3730;--up:#ff7a70;--dn:#7ea6ff;--gd:#e4b04c;color-scheme:dark}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.5 "IBM Plex Sans KR",system-ui,-apple-system,sans-serif}
+.w{max-width:980px;margin:0 auto;padding:16px 14px 40px}
+h1{font-size:20px;margin:0}h2{font-size:15px;margin:0 0 10px}
+.top{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-bottom:12px}
+.hero{background:var(--ac);color:#fff;border-radius:18px;padding:20px;margin-bottom:12px}
+.hero small{opacity:.85}.hero .big{font-size:34px;font-weight:700;letter-spacing:-.5px;margin:2px 0}
+.hero .row{display:flex;flex-wrap:wrap;gap:6px 22px;margin-top:8px}
+.g{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}
+.k{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px}
+.k b{display:block;font-size:18px;margin-top:2px}.k span{color:var(--mu);font-size:12px}
+.c{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
+.sc{overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:640px}
+th,td{padding:5px 6px;text-align:right;border-bottom:1px solid var(--bd);white-space:nowrap}th{color:var(--mu);font-weight:500;font-size:12px}
+th:first-child,td:first-child{text-align:left}
+td input.ovr{border-style:dashed}input::placeholder{opacity:.45}input,select{font:inherit;color:var(--tx);background:var(--bg);border:1px solid var(--bd);border-radius:6px;padding:4px 6px;width:100%;min-width:56px;text-align:right}
+input[type=text],td:first-child input{text-align:left}
+td input.n{width:92px}td input.s{width:96px;text-align:left}
+button{font:inherit;cursor:pointer;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:8px;padding:5px 10px}
+button.p{background:var(--ac);color:#fff;border-color:var(--ac)}
+.up{color:var(--up)}.dn{color:var(--dn)}.mu{color:var(--mu)}
+.bar{height:10px;background:var(--ac2);border-radius:6px;overflow:hidden}.bar i{display:block;height:100%;background:var(--ac)}
+.f{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:10px}.f label{font-size:12px;color:var(--mu)}
+.acc{display:flex;flex-wrap:wrap;gap:8px}.acc div{flex:1 1 200px;background:var(--ac2);border-radius:10px;padding:10px}
+.note{font-size:12px;color:var(--mu);margin-top:8px}
+svg{width:100%;height:auto;display:block}
+</style></head><body><div class="w"><div id="app"></div></div>
+<script>
+const SAMPLE={owner:'전체',goal:300000000,fx:1400,view:'acc',
+accounts:[
+{name:'연금저축 A (미래에셋)',type:'연금저축',owner:'나',holdings:[
+{name:'KODEX 미국S&P500',cur:'KRW',qty:120,avg:19500,price:21800,yld:1.2,freq:4,auto:200000,day:10,ovr:null},
+{name:'TIGER 미국배당다우존스',cur:'KRW',qty:200,avg:12000,price:12900,yld:3.6,freq:12,auto:300000,day:10,ovr:null}]},
+{name:'연금저축 B (삼성)',type:'연금저축',owner:'배우자',holdings:[
+{name:'TIGER 미국나스닥100',cur:'KRW',qty:15,avg:125000,price:141000,yld:0.6,freq:4,auto:0,day:25,ovr:null},
+{name:'SOL 미국배당미국채혼합50',cur:'KRW',qty:150,avg:10100,price:10350,yld:4.5,freq:12,auto:300000,day:25,ovr:null}]},
+{name:'일반 계좌 (키움)',type:'일반',owner:'나',holdings:[
+{name:'TIGER 미국배당다우존스',cur:'KRW',qty:50,avg:12400,price:12900,yld:3.6,freq:12,auto:0,day:10,ovr:null},
+{name:'삼성전자',cur:'KRW',qty:30,avg:68000,price:72000,yld:2,freq:4,auto:0,day:10,ovr:null}]},
+{name:'해외주식 (토스)',type:'해외',owner:'나',holdings:[
+{name:'VOO',cur:'USD',qty:5,avg:480,price:540,yld:1.2,freq:4,auto:0,day:10,ovr:null}]}],
+others:[{owner:'나',name:'비상금 통장',amt:10000000,type:'자산'},{owner:'배우자',name:'예금·적금',amt:15000000,type:'자산'},{owner:'나',name:'전세보증금 대출',amt:-30000000,type:'부채'}],
+sim:{monthly:0,g:5,y:3.5,years:20,reinvest:1}};
+const clone=o=>JSON.parse(JSON.stringify(o));
+const BLANK={owner:'전체',goal:0,fx:1400,view:'acc',accounts:[],others:[],hist:[],sim:{monthly:0,g:5,y:3.5,years:20,reinvest:1}};
+const uid=()=>Math.random().toString(36).slice(2,9);
+const CAP=!!(window.claude&&window.claude.use); // 캡처 읽기(Claude 환경 전용) 사용 가능 여부
+const E=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+let LAST={net:0,val:0,cost:0},XC='';
+let S;try{S=JSON.parse(localStorage.getItem('assetdash2'))}catch(e){}
+if(!S)S=clone(BLANK);
+function fix(){S.fx=S.fx||1400;S.view=S.view||'acc';S.hist=S.hist||[];S.accounts.forEach(a=>a.id=a.id||uid());S.others.forEach(o=>o.id=o.id||uid())}fix();
+const save=()=>{try{localStorage.setItem('assetdash2',JSON.stringify(S))}catch(e){}};
+const W=n=>Math.round(n).toLocaleString('ko-KR')+'원';
+const K=n=>{const a=Math.abs(n),s=n<0?'-':'';return a>=1e8?s+(a/1e8).toFixed(2)+'억원':a>=1e4?s+Math.round(a/1e4).toLocaleString('ko-KR')+'만원':s+Math.round(a).toLocaleString('ko-KR')+'원'};
+const P=n=>(n>=0?'+':'')+n.toFixed(1)+'%';
+const cls=n=>n>=0?'up':'dn';
+const X=h=>h.cur==='USD'?S.fx:1;const M=(n,c)=>c==='USD'?'$'+(Math.round(n*100)/100).toLocaleString('en-US'):W(n);const TY=['연금저축','IRP','ISA','일반','해외'];const PEN=t=>t==='연금저축'||t==='IRP';
+const OWL=()=>[...new Set(['나','배우자','아이',...S.accounts.map(x=>x.owner),...S.others.map(x=>x.owner)])].map(x=>[x,x]);
+const ow=()=>['전체',...new Set([...S.accounts,...S.others].map(x=>x.owner).filter(Boolean))];
+const f=a=>S.owner==='전체'||a.owner===S.owner;
+const MP={12:[1,2,3,4,5,6,7,8,9,10,11,12],4:[3,6,9,12],2:[6,12],1:[12]};
+const inp=(p,v,t,c,ph)=>`<td><input class="${c||''}" data-p="${p}" ${t==='t'?'data-s="1" type="text"':'type="number" step="any"'} value="${E(v)}" placeholder="${ph||''}"></td>`;
+const sel=(p,v,o,str)=>`<td><select data-p="${p}" ${str?'data-s="1"':''}>${o.map(x=>`<option value="${x[0]}" ${String(v)===String(x[0])?'selected':''}>${x[1]}</option>`).join('')}</select></td>`;
+function walk(p){const k=p.split('.');let o=S;for(let i=0;i<k.length-1;i++)o=o[k[i]];return[o,k[k.length-1]]}
+function del(p,msg){if(msg&&!confirm(msg))return;const[o,k]=walk(p);o.splice(+k,1);save();render()}
+function addAcc(){S.accounts.push({id:uid(),name:'새 계좌',type:'일반',owner:'나',holdings:[]});save();render()}
+function addH(ai){S.accounts[ai].holdings.push({name:'새 종목',cur:'KRW',qty:0,avg:0,price:0,yld:2,freq:12,auto:0,day:10,ovr:null});save();render()}
+function addO(){S.others.push({id:uid(),owner:'나',name:'새 항목',amt:0,type:'자산'});save();render()}
+function blank(){if(!confirm('모든 입력을 지우고 빈 상태로 시작할까요?'))return;S={owner:'전체',goal:0,fx:S.fx||1400,view:'acc',accounts:[],others:[],hist:[],sim:{monthly:0,g:5,y:3.5,years:20,reinvest:1}};fix();save();render()}
+async function shot(ai){let sm=null;try{sm=await window.claude.use('sample')}catch(e){}
+if(!sm){alert('이 화면에서는 캡처 읽기를 쓸 수 없어요. 표에 직접 입력해 주세요.');return}
+if(!S.shotOk){if(!confirm('캡처 이미지는 숫자를 읽기 위해서만 Claude로 전송되고 이 페이지에 저장되지 않아요. 계좌번호와 이름은 가린 뒤 올려 주세요. 계속할까요?'))return;S.shotOk=1;save()}
+const fi=document.createElement('input');fi.type='file';fi.accept='image/*';
+fi.onchange=async()=>{const file=fi.files[0];if(!file)return;
+try{const r=await sm.json('증권사 앱 보유종목 캡처입니다. 보이는 종목만 읽어 JSON 배열로만 답하세요: [{"name":"종목명","qty":보유수량,"avg":평균매수가,"price":현재가,"cur":"KRW 또는 USD"}]. 보이지 않는 값은 0으로 두고 추측하지 마세요. 계좌번호·이름 등 개인정보는 무시하세요.',{images:[file]});
+const L=(Array.isArray(r)?r:[]).filter(x=>x&&x.name);
+if(!L.length){alert('종목을 읽지 못했어요. 더 선명한 캡처로 다시 시도해 주세요.');return}
+if(!confirm(L.map(x=>`${x.name} ${x.qty}주 · 평균 ${x.avg} · 현재 ${x.price}`).join('\n')+'\n\n읽은 값이 맞나요? 반영하면 같은 이름 종목은 덮어씁니다.'))return;
+const A=S.accounts[ai];L.forEach(x=>{const c=x.cur==='USD'?'USD':'KRW',h=A.holdings.find(z=>z.name.trim().toUpperCase()===String(x.name).trim().toUpperCase());
+if(h){h.qty=+x.qty||0;if(+x.avg)h.avg=+x.avg;if(+x.price)h.price=+x.price;h.cur=c}else A.holdings.push({name:String(x.name),cur:c,qty:+x.qty||0,avg:+x.avg||0,price:+x.price||0,yld:0,freq:12,auto:0,day:10,ovr:null})});
+A.asof=new Date().toISOString().slice(0,10);save();render()}catch(e){alert(e&&e.code==='not_granted'?'캡처 읽기 사용이 허용되지 않았어요.':'읽는 중 문제가 생겼어요. 잠시 뒤 다시 시도해 주세요.')}};
+fi.click()}
+function rec(){const m=new Date().toISOString().slice(0,7);S.hist=S.hist.filter(h=>!(h.o===S.owner&&h.m===m));S.hist.push({o:S.owner,m,net:LAST.net,val:LAST.val,cost:LAST.cost});save();render()}
+function exp(){const o={v:1,accounts:S.accounts.filter(f),others:S.others.filter(f)};XC=btoa(unescape(encodeURIComponent(JSON.stringify(o))));render();setTimeout(()=>{const t=document.getElementById('xc');if(t)t.select();try{navigator.clipboard.writeText(XC)}catch(e){}},0)}
+function imp(){const t=document.getElementById('xi').value.trim();if(!t)return;let o;try{o=JSON.parse(decodeURIComponent(escape(atob(t))))}catch(e){alert('코드를 읽지 못했어요. 전체를 정확히 붙여넣었는지 확인해 주세요.');return}
+if(!o||!Array.isArray(o.accounts)){alert('올바른 코드가 아니에요.');return}
+const who=prompt('가져올 계좌의 소유자 이름을 적어 주세요 (예: 배우자)','배우자');if(!who)return;
+const cl=x=>String(x==null?'':x).replace(/[<>"&]/g,'');
+o.accounts.forEach(a=>{if(!a||!Array.isArray(a.holdings))return;const acc={id:cl(a.id)||uid(),name:cl(a.name),type:TY.includes(a.type)?a.type:'일반',owner:cl(who),asof:cl(a.asof),holdings:a.holdings.map(h=>({name:cl(h.name),cur:h.cur==='USD'?'USD':'KRW',qty:+h.qty||0,avg:+h.avg||0,price:+h.price||0,yld:+h.yld||0,freq:[12,4,2,1].includes(+h.freq)?+h.freq:12,auto:+h.auto||0,day:+h.day||10,ovr:h.ovr==null?null:+h.ovr}))};const i=S.accounts.findIndex(x=>x.id===acc.id);if(i>=0)S.accounts[i]=acc;else S.accounts.push(acc)});
+(Array.isArray(o.others)?o.others:[]).forEach(x=>{if(!x)return;const it={id:cl(x.id)||uid(),owner:cl(who),name:cl(x.name),amt:+x.amt||0,type:x.type==='부채'?'부채':'자산'};const i=S.others.findIndex(z=>z.id===it.id);if(i>=0)S.others[i]=it;else S.others.push(it)});
+save();render()}
+// ---- .json 파일 백업 / 불러오기 ----
+function clean(d){const cl=x=>String(x==null?'':x).replace(/[<>"&]/g,'');const A=(Array.isArray(d.accounts)?d.accounts:[]).filter(a=>a&&Array.isArray(a.holdings)).map(a=>({id:cl(a.id)||uid(),name:cl(a.name)||'계좌',type:TY.includes(a.type)?a.type:'일반',owner:cl(a.owner)||'나',asof:/^\d{4}-\d{2}-\d{2}$/.test(a.asof||'')?a.asof:undefined,holdings:a.holdings.filter(h=>h).map(h=>({name:cl(h.name)||'종목',cur:h.cur==='USD'?'USD':'KRW',qty:+h.qty||0,avg:+h.avg||0,price:+h.price||0,yld:+h.yld||0,freq:[12,4,2,1].includes(+h.freq)?+h.freq:12,auto:+h.auto||0,day:+h.day||10,ovr:(h.ovr==null||h.ovr==='')?null:(+h.ovr||0)}))}));
+const B=(Array.isArray(d.others)?d.others:[]).filter(x=>x).map(x=>({id:cl(x.id)||uid(),owner:cl(x.owner)||'나',name:cl(x.name)||'항목',amt:+x.amt||0,type:x.type==='부채'?'부채':'자산'}));
+const H=(Array.isArray(d.hist)?d.hist:[]).filter(h=>h&&/^\d{4}-\d{2}$/.test(h.m||'')).map(h=>({o:cl(h.o),m:h.m,net:+h.net||0,val:+h.val||0,cost:+h.cost||0}));
+const s=d.sim||{};return{owner:cl(d.owner)||'전체',goal:+d.goal||0,fx:+d.fx||1400,view:d.view==='all'?'all':'acc',accounts:A,others:B,hist:H,sim:{monthly:+s.monthly||0,g:+s.g||0,y:+s.y||0,years:+s.years||20,reinvest:s.reinvest?1:0}}}
+function expJSON(){const o={app:'asset-dashboard',v:2,savedAt:new Date().toISOString(),data:S};const b=new Blob([JSON.stringify(o,null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='자산대시보드-백업-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}
+function impJSON(){const fi=document.createElement('input');fi.type='file';fi.accept='.json,application/json';
+fi.onchange=()=>{const f=fi.files[0];if(!f)return;if(f.size>4e6){alert('파일이 너무 커요(4MB 초과). 자산 대시보드 백업 파일이 맞는지 확인해 주세요.');return}const rd=new FileReader();
+rd.onerror=()=>alert('파일을 읽지 못했어요. 다시 시도해 주세요.');
+rd.onload=()=>{let o;try{o=JSON.parse(String(rd.result).replace(/^\uFEFF/,''))}catch(e){alert('JSON 파일을 읽지 못했어요. 백업할 때 받은 파일 그대로인지 확인해 주세요.');return}
+const d=o&&o.data?o.data:o;if(!d||!Array.isArray(d.accounts)||!Array.isArray(d.others)){alert('자산 대시보드 백업 파일이 아니에요.');return}
+const when=o&&o.savedAt?String(o.savedAt).slice(0,10):'날짜 없음';
+if(!confirm('백업 파일('+when+')의 내용으로 지금 데이터를 바꿀까요?\n계좌 '+d.accounts.length+'개 · 기타 항목 '+d.others.length+'개 · 월별 기록 '+(Array.isArray(d.hist)?d.hist.length:0)+'건\n지금 기기에 있던 내용은 사라집니다.'))return;
+S=clean(d);fix();save();XC='';render();alert('백업 파일을 불러왔어요.')};
+rd.readAsText(f,'utf-8')};
+fi.click()}
+function reset(){if(confirm('예시 데이터로 되돌릴까요? 입력한 내용이 사라집니다.')){S=clone(SAMPLE);fix();save();render()}}
+function apply(ai){if(!confirm('다음 자동매수분을 보유 수량과 평균매수가에 반영할까요?'))return;S.accounts[ai].holdings.forEach(h=>{const n=ns(h);if(n>0){h.avg=(h.avg*h.qty+n*h.price)/(h.qty+n);h.qty+=n}h.ovr=null});save();render()}
+const ns=h=>h.ovr!=null?h.ovr:(h.price>0?Math.floor((h.auto||0)/(h.price*X(h))):0);
+document.addEventListener('change',e=>{const t=e.target,p=t.dataset.p;if(!p)return;const[o,k]=walk(p);o[k]=t.dataset.s?t.value:(t.value===''&&k==='ovr'?null:Number(t.value)||0);const am=p.match(/^accounts\.(\d+)\.holdings\./);if(am)S.accounts[am[1]].asof=new Date().toISOString().slice(0,10);save();render()});
+function render(){
+if(!ow().includes(S.owner))S.owner='전체';
+const now=new Date(),mo=now.getMonth()+1,td=now.getDate();
+const nxt=d=>{const t=td<=d?new Date(now.getFullYear(),now.getMonth(),d):new Date(now.getFullYear(),now.getMonth()+1,d);return(t.getMonth()+1)+'/'+t.getDate()};
+let cost=0,val=0,div=0,mdiv=0,mon=0,pm=0,pon=0,ecost=0,eval_=0;const AG={},BT={};
+const accHTML=S.accounts.map((a,ai)=>{if(!f(a))return'';
+let c=0,v=0,d=0,ec=0,ev=0,m=0;const stale=a.asof&&(Date.now()-new Date(a.asof))>6048e5;
+a.holdings.forEach(h=>{const n=ns(h),x=X(h),hc=h.avg*h.qty*x,hv=h.price*h.qty*x;c+=hc;v+=hv;const dv=hv*h.yld/100;d+=dv;if(MP[h.freq].includes(mo))mdiv+=dv/h.freq;ec+=hc+n*h.price*x;ev+=(h.qty+n)*h.price*x;m+=h.auto||0;if(PEN(a.type||'연금저축')){pm+=h.auto||0;if((a.type||'연금저축')==='연금저축')pon+=h.auto||0;}const key=h.name.trim().toUpperCase(),g=AG[key]=AG[key]||{name:h.name,cur:h.cur||'KRW',q:0,cq:0,ck:0,vk:0,dk:0,accs:[]};g.q+=h.qty;g.cq+=h.avg*h.qty;g.ck+=hc;g.vk+=hv;g.dk+=dv;if(!g.accs.includes(a.name))g.accs.push(a.name)});BT[a.type||'연금저축']=(BT[a.type||'연금저축']||0)+v;
+cost+=c;val+=v;div+=d;mon+=m;ecost+=ec;eval_+=ev;
+const r=c?(v-c)/c*100:0,er=ec?(ev-ec)/ec*100:0,pa=`accounts.${ai}`;
+return `<div class="c"><div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px"><input style="flex:1 1 180px;text-align:left;font-weight:700" data-s="1" data-p="${pa}.name" value="${E(a.name)}" aria-label="계좌 이름"><select style="width:auto" data-s="1" data-p="${pa}.type">${TY.map(o=>`<option ${o===(a.type||'연금저축')?'selected':''}>${o}</option>`).join('')}</select><select style="width:auto" data-s="1" data-p="${pa}.owner">${OWL().map(o=>`<option ${o[0]===a.owner?'selected':''}>${o[0]}</option>`).join('')}</select>${CAP?'<button onclick="shot('+ai+')">📷 캡처로 채우기</button>':''}<button onclick="del('${pa}','이 계좌를 삭제할까요?')">계좌 삭제</button></div>
+<div class="note" style="margin:-4px 0 8px">시세 기준일 ${a.asof||'아직 없음'}${stale?' · 7일이 지났어요. 현재가를 업데이트해 주세요':''}</div><div class="g" style="margin-bottom:10px"><div class="k"><span>원금</span><b>${K(c)}</b></div><div class="k"><span>현재 평가금액</span><b>${K(v)}</b></div><div class="k"><span>수익률</span><b class="${cls(r)}">${P(r)}</b><span>${K(v-c)}</span></div><div class="k"><span>다음 자동매수 후 예상</span><b>${K(ev)}</b><span class="${cls(er)}">${P(er)}</span></div><div class="k"><span>연 예상 배당</span><b>${K(d)}</b></div></div>
+<div class="sc"><table><tr><th>보유종목</th><th>개수(주)</th><th>평균매수가</th><th>원금</th><th>현재가</th><th>평가금액</th><th>수익률</th><th>배당률%</th><th>주기</th><th>통화</th><th></th></tr>
+${a.holdings.map((h,hi)=>{const q=`${pa}.holdings.${hi}`,cc=h.avg*h.qty,vv=h.price*h.qty;return `<tr>${inp(q+'.name',h.name,'t','s')}${inp(q+'.qty',h.qty,'n','n')}${inp(q+'.avg',Math.round(h.avg*100)/100,'n','n')}<td>${M(cc,h.cur)}</td>${inp(q+'.price',h.price,'n','n')}<td>${M(vv,h.cur)}</td><td class="${cls(vv-cc)}">${P(cc?(vv/cc-1)*100:0)}</td>${inp(q+'.yld',h.yld,'n','n')}${sel(q+'.freq',h.freq,[[12,'월'],[4,'분기'],[2,'반기'],[1,'연']])}${sel(q+'.cur',h.cur||'KRW',[['KRW','원'],['USD','달러']],1)}<td><button onclick="del('${q}')">✕</button></td></tr>`}).join('')}</table></div>
+<h2 style="margin-top:14px">자동매수와 다음달 예상</h2><div class="sc"><table><tr><th>종목</th><th>월 매수금액</th><th>지정일</th><th>다음 매수일</th><th>예상 매수(주)</th><th>예상 총 개수</th><th>예상 원금</th><th>예상 평가금액</th><th>예상 수익률</th></tr>
+${a.holdings.map((h,hi)=>{const q=`${pa}.holdings.${hi}`,n=ns(h),auto=h.price>0?Math.floor((h.auto||0)/(h.price*X(h))):0,ecc=(h.avg*h.qty+n*h.price)*X(h),evv=(h.qty+n)*h.price*X(h);return `<tr><td>${E(h.name)}</td>${inp(q+'.auto',h.auto,'n','n')}${inp(q+'.day',h.day,'n','n')}<td>${h.auto?nxt(h.day):'-'}</td>${inp(q+'.ovr',h.ovr,'n','n ovr',String(auto))}<td>${h.qty+n}주 <span class="up">${n?'(+'+n+')':''}</span></td><td>${W(ecc)}</td><td>${W(evv)}</td><td class="${cls(evv-ecc)}">${P(ecc?(evv/ecc-1)*100:0)}</td></tr>`}).join('')}</table></div>
+<p style="display:flex;flex-wrap:wrap;gap:8px"><button class="p" onclick="addH(${ai})">+ 종목 추가</button><button onclick="apply(${ai})">자동매수 반영하기</button></p>
+<p class="note">예상 매수 주수는 '월 매수금액 ÷ 현재가'로 자동 계산한 값이 칸에 흐리게 보입니다. 실제와 다를 때만 숫자를 입력하세요(비우면 자동 계산). 현재가가 그대로라고 가정하며, 남는 잔돈은 계산에 넣지 않았습니다. '자동매수 반영하기'를 누르면 개수와 평균매수가가 갱신돼 수익률이 다시 계산됩니다.</p></div>`}).join('');
+const tot=val||1,rows=Object.values(AG).sort((a,b)=>b.vk-a.vk);
+const consHTML=`<div class="c"><h2>종목별 통합 (여러 계좌 합산)</h2><div class="sc"><table style="min-width:760px"><tr><th>종목</th><th>보유 계좌</th><th>총 개수</th><th>평균매수가</th><th>원금</th><th>평가금액</th><th>수익률</th><th>비중</th><th>연 배당</th></tr>${rows.map(r=>`<tr><td>${E(r.name)}</td><td style="white-space:normal;text-align:left">${E(r.accs.join(', '))}</td><td>${r.q}</td><td>${M(r.q?r.cq/r.q:0,r.cur)}</td><td>${W(r.ck)}</td><td>${W(r.vk)}</td><td class="${cls(r.vk-r.ck)}">${P(r.ck?(r.vk/r.ck-1)*100:0)}</td><td>${(r.vk/tot*100).toFixed(1)}%</td><td>${W(r.dk)}</td></tr>`).join('')}</table></div><p class="note">종목 이름이 같으면 여러 계좌의 보유분을 하나로 합쳐 평균매수가를 다시 계산합니다. 같은 종목은 계좌마다 같은 이름으로 입력하세요. 해외주식은 입력한 환율로 원화 환산하며 환차손익은 반영하지 않습니다.</p></div><div class="c"><h2>계좌 유형별 비중</h2>${Object.entries(BT).map(([t,v])=>`<div style="margin:8px 0"><div style="display:flex;justify-content:space-between"><span>${t}</span><span>${K(v)} · ${(v/tot*100).toFixed(1)}%</span></div><div class="bar"><i style="width:${v/tot*100}%"></i></div></div>`).join('')}</div>`;
+const tabs=`<div style="display:flex;gap:6px;margin-bottom:10px"><button class="${S.view==='acc'?'p':''}" onclick="S.view='acc';save();render()">계좌별</button><button class="${S.view==='all'?'p':''}" onclick="S.view='all';save();render()">종목별 통합</button></div>`;
+const emptyHTML=`<div class="c"><h2>처음이신가요?</h2><p>① 아래 <b>+ 계좌 추가</b>로 계좌 이름(예: 연금저축 A)과 유형을 정하세요. ${CAP?'② 종목을 직접 입력하거나 <b>📷 캡처로 채우기</b>로 불러오세요.':'② 표에 종목·수량·평균매수가·현재가를 직접 입력하세요.'} ③ 월 자동매수 금액과 지정일을 적으면 다음달 예상까지 계산돼요.</p><button onclick="reset()">예시 데이터로 먼저 둘러보기</button></div>`;
+const O=S.others.map((h,i)=>[h,i]).filter(x=>f(x[0]));
+const assetOth=O.filter(x=>x[0].type==='자산').reduce((s,[o])=>s+o.amt,0),debt=O.filter(x=>x[0].type==='부채').reduce((s,[o])=>s+Math.abs(o.amt),0);
+const net=val+assetOth-debt,goalPct=S.goal?Math.min(100,Math.max(0,net/S.goal*100)):0,pl=val-cost,plr=cost?pl/cost*100:0;LAST={net,val,cost};
+const sm=S.sim,m=sm.monthly||mon,g=sm.g/100,y=sm.y/100;let v=val,c=val,cash=0;const pts=[{y:0,v,c}];
+for(let yr=1;yr<=sm.years;yr++){for(let k=0;k<12;k++){v+=m;c+=m;v*=1+(sm.reinvest?g+y:g)/12;if(!sm.reinvest)cash+=v*y/12}pts.push({y:yr,v:v+cash,c})}
+const fin=pts[pts.length-1],finDiv=v*y;
+const cw=600,ch=200,mx=Math.max(...pts.map(p=>p.v),1),PX=p=>40+p.y/Math.max(sm.years,1)*(cw-50),PY=n=>ch-20-n/mx*(ch-35);
+const line=k=>pts.map(p=>PX(p)+','+PY(p[k])).join(' ');
+const chart=`<svg viewBox="0 0 ${cw} ${ch}" role="img" aria-label="자산 성장 예측"><polyline points="${line('v')} ${PX(fin)},${PY(0)} ${PX(pts[0])},${PY(0)}" fill="var(--ac2)" stroke="none"/><polyline points="${line('v')}" fill="none" stroke="var(--ac)" stroke-width="2.5"/><polyline points="${line('c')}" fill="none" stroke="var(--mu)" stroke-width="1.5" stroke-dasharray="5 4"/><text x="40" y="12" font-size="11" fill="var(--mu)">${K(mx)}</text><text x="40" y="${ch-4}" font-size="11" fill="var(--mu)">지금</text><text x="${cw-10}" y="${ch-4}" font-size="11" text-anchor="end" fill="var(--mu)">${sm.years}년 후</text><text x="${cw-10}" y="${PY(fin.v)-6}" font-size="11" text-anchor="end" fill="var(--ac)" font-weight="700">${K(fin.v)}</text><text x="${cw-10}" y="${PY(fin.c)+14}" font-size="11" text-anchor="end" fill="var(--mu)">납입원금 ${K(fin.c)}</text></svg>`;
+const HS=S.hist.filter(h=>h.o===S.owner).sort((a,b)=>a.m<b.m?-1:1),hm=Math.max(...HS.map(h=>h.val),1),hx=i=>40+(HS.length>1?i/(HS.length-1):.5)*(cw-60),hy=n=>ch-20-n/hm*(ch-35),hl=k=>HS.map((h,i)=>hx(i)+','+hy(h[k])).join(' ');
+const hl2=HS[HS.length-1];
+const histCard=`<div class="c"><h2>자산 추이 (월별 기록)</h2><button class="p" onclick="rec()">이번달 자산 기록하기</button>${HS.length?`<svg viewBox="0 0 ${cw} ${ch}" role="img" aria-label="월별 자산 추이"><polyline points="${hl('val')}" fill="none" stroke="var(--ac)" stroke-width="2.5"/><polyline points="${hl('cost')}" fill="none" stroke="var(--mu)" stroke-width="1.5" stroke-dasharray="5 4"/>${HS.map((h,i)=>`<circle cx="${hx(i)}" cy="${hy(h.val)}" r="3.5" fill="var(--ac)"/><text x="${hx(i)}" y="${ch-4}" font-size="10" text-anchor="middle" fill="var(--mu)">${h.m.slice(2)}</text>`).join('')}<text x="40" y="12" font-size="11" fill="var(--mu)">${K(hm)}</text></svg><p class="note">초록 선은 평가금액, 점선은 투자원금이에요. 두 선의 간격이 벌어질수록 잘 불어나고 있다는 뜻이에요. 최근 기록 기준 손익 ${K(hl2.val-hl2.cost)}.</p>`:'<p class="note">월 1회 기록하면 성장 그래프가 그려져요. 투자 평가금액과 원금이 함께 저장돼요.</p>'}</div>`;
+const annP=pon*12,annA=pm*12,tpP=Math.min(100,annP/6000000*100),tpA=Math.min(100,annA/9000000*100);
+const so=(k,v)=>`data-p="sim.${k}" value="${v}"`;
+document.getElementById('app').innerHTML=`
+<div class="top"><h1>우리가족 자산 대시보드</h1><div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center"><label class="mu" style="font-size:12px">환율 $1=<input type="number" data-p="fx" value="${S.fx}" style="width:72px;display:inline-block"></label><select data-s="1" data-p="owner" style="width:auto">${ow().map(o=>`<option ${o===S.owner?'selected':''}>${o}</option>`).join('')}</select><button onclick="reset()">예시로 초기화</button><button onclick="blank()">비우고 시작</button></div></div>
+<p class="note" style="margin:0 0 10px">🔒 입력한 내용은 이 기기·브라우저에만 저장되고 다른 사람은 볼 수 없어요. 기기를 바꾸거나 브라우저 데이터를 지우면 사라지니 맨 아래에서 <b>.json 파일</b> 또는 백업 코드로 가끔 저장해 두세요.</p><div class="hero"><small>${S.owner==='전체'?'우리가족':S.owner} 순자산</small><div class="big">${W(net)}</div><div class="row"><span>투자자산 평가금액 ${K(val)}</span><span>수익률 ${P(plr)} (${K(pl)})</span></div>
+<div style="margin-top:12px"><div class="bar" style="background:rgba(255,255,255,.25)"><i style="width:${goalPct}%;background:#fff"></i></div><small>목표 ${K(S.goal)}의 ${goalPct.toFixed(1)}% 달성</small></div></div>
+<div class="g"><div class="k"><span>원금 합계</span><b>${K(cost)}</b></div><div class="k"><span>다음 자동매수 후 예상 평가</span><b>${K(eval_)}</b><span class="${cls(eval_-ecost)}">${P(ecost?(eval_-ecost)/ecost*100:0)}</span></div><div class="k"><span>연 예상 배당</span><b>${K(div)}</b></div><div class="k"><span>이번달(${mo}월) 배당 예정</span><b>${K(mdiv)}</b></div><div class="k"><span>월 정기입금</span><b>${K(mon)}</b></div></div>
+<p class="note" style="margin:-2px 0 10px">배당금 세금: 일반·해외 계좌에서 받는 배당은 <b>15.4%</b>(소득세 14% + 지방소득세 1.4%)가 원천징수된 뒤 입금되고, 해외 배당은 미국 원천징수 15%가 먼저 떼인 뒤 국내에서 추가 정산됩니다. 연금저축·IRP 안에서는 배당세가 바로 붙지 않고(과세이연) 연금 수령 때 연금소득세(3.3~5.5%)로 대체됩니다. 위 배당 금액은 모두 <b>세전</b> 기준이에요.</p>
+${tabs}${S.view==='all'?consHTML:(accHTML||emptyHTML)}
+<p><button class="p" onclick="addAcc()">+ 계좌 추가</button></p>
+${histCard}<div class="c"><h2>이렇게 모으면? 미래 예측</h2><div class="f"><div><label>월 납입액 (0이면 자동매수 합계)</label><input type="number" ${so('monthly',sm.monthly)}></div><div><label>기간(년, 퇴직까지)</label><input type="number" ${so('years',sm.years)}></div><div><label>연 주가상승률 %</label><input type="number" step="0.1" ${so('g',sm.g)}></div><div><label>연 배당률 %</label><input type="number" step="0.1" ${so('y',sm.y)}></div><div><label>배당금</label><select data-p="sim.reinvest"><option value="1" ${sm.reinvest?'selected':''}>재투자</option><option value="0" ${sm.reinvest?'':'selected'}>현금 수령</option></select></div></div>
+<div class="g"><div class="k"><span>${sm.years}년 후 예상 자산</span><b>${K(fin.v)}</b></div><div class="k"><span>총 납입원금</span><b>${K(fin.c)}</b></div><div class="k"><span>불어난 금액</span><b class="up">${K(fin.v-fin.c)}</b></div><div class="k"><span>퇴직시점 연 배당소득</span><b>${K(finDiv)}</b></div><div class="k"><span>퇴직시점 월 배당소득</span><b>${K(finDiv/12)}</b></div></div>${chart}
+<p class="note">매월 ${W(m)}씩 ${sm.years}년간 납입하는 경우입니다. 세전·물가상승 미반영 추정치이며 실제 수익을 보장하지 않습니다. 연금계좌 안에서는 배당소득세가 과세이연되고, 연금 수령 때 연금소득세(연령별 3.3~5.5%)가 붙습니다.</p></div>
+<div class="c"><h2>연금저축 세액공제 한도</h2>
+<div style="display:flex;justify-content:space-between;font-size:12px;margin:2px 0 4px"><span class="mu">연금저축만 · 한도 600만원</span><span>${K(annP)} · ${tpP.toFixed(0)}%</span></div><div class="bar"><i style="width:${tpP}%"></i></div>
+<div style="display:flex;justify-content:space-between;font-size:12px;margin:14px 0 4px"><span class="mu">연금저축 + IRP 합산 · 한도 900만원</span><span>${K(annA)} · ${tpA.toFixed(0)}%</span></div><div class="bar"><i style="width:${tpA}%"></i></div>
+<p class="note">월 자동매수 금액 × 12개월로 환산한 값이에요(실제 납입액과 다를 수 있습니다). 연금저축 단독 600만원, IRP를 더하면 900만원까지 세액공제 대상이며, 공제율은 총급여에 따라 13.2%(5,500만원 초과) / 16.5%(5,500만원 이하)입니다. 한도를 넘긴 납입분은 공제되지 않지만 계좌에 그대로 쌓입니다.</p></div>
+<div class="c"><h2>그 외 자산·부채</h2><div class="sc"><table style="min-width:420px"><tr><th>항목</th><th>소유</th><th>구분</th><th>금액(원)</th><th></th></tr>
+${O.map(([o,i])=>{const q='others.'+i;return `<tr>${inp(q+'.name',o.name,'t','s')}${sel(q+'.owner',o.owner,OWL(),1)}${sel(q+'.type',o.type,[['자산','자산'],['부채','부채']],1)}${inp(q+'.amt',o.amt,'n','n')}<td><button onclick="del('${q}')">✕</button></td></tr>`}).join('')}</table></div><p><button class="p" onclick="addO()">+ 항목 추가</button></p>
+<div class="f"><div><label>순자산 목표 (원)</label><input type="number" data-p="goal" value="${S.goal}"></div></div>
+<p class="note">순자산 = <b>전체 투자자산 평가금액</b>(연금저축·IRP·ISA·일반·해외 계좌 전부) <b>+ 기타 자산 − 부채</b>. 예금·비상금·보험·부동산·대출을 넣어 가계 전체를 한눈에 볼 수 있습니다.<br>부채 항목은 <b>금액을 양수(예: 3,000만)로 적어도 구분을 '부채'로 고르면 자동으로 차감</b>됩니다(−를 붙여도 똑같이 한 번만 빠져요). 자산 항목에 −를 적으면 그만큼 줄어들 뿐이니 부채는 꼭 '부채'로 구분해 주세요.</p></div>
+<div class="c"><h2>백업 · 가족과 공유</h2><p class="note" style="margin-top:0">로그인 없이 쓰는 대신 데이터를 옮겨요. <b>.json 파일</b>은 기기를 바꾸거나 데이터를 지울 때 그대로 되살리는 백업용이고, 코드(복사·붙여넣기)는 가족에게 내 계좌만 보내 공유할 때 써요. 파일과 코드 모두 금융정보가 들어 있으니 가족끼리 개인 메신저로만 전달하고 다른 곳에 올리지 마세요.</p>
+<p style="display:flex;flex-wrap:wrap;gap:8px;margin:0 0 4px"><button class="p" onclick="expJSON()">⬇️ .json 파일로 백업</button><button onclick="impJSON()">📂 백업 파일 불러오기</button></p>
+<p class="note" style="margin:0 0 12px">파일에는 지금 화면의 모든 계좌·기타 자산·월별 기록이 담겨요. 불러오면 지금 데이터를 바꾸므로, 먼저 한 번 백업해 두면 안전합니다.</p><button class="p" onclick="exp()">코드 만들기</button><textarea id="xc" readonly rows="3" style="width:100%;margin:8px 0;font:12px monospace;background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:6px">${XC}</textarea><textarea id="xi" rows="3" placeholder="받은 코드를 여기에 붙여넣기" style="width:100%;margin:8px 0;font:12px monospace;background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:6px"></textarea><button onclick="imp()">가져오기 (같은 계좌는 갱신, 새 계좌는 추가)</button></div>`}
+render();
+</script></body></html>

@@ -1,0 +1,1267 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>무소음 비주얼 타이머 (Focus Disk)</title>
+
+  <!-- PWA & 모바일 홈 화면 추가 전용 메타 태그 -->
+  <meta name="description" content="남은 시간을 색깔 원판으로 직관적으로 확인하는 무소음 비주얼 타이머 (Focus Disk)" />
+  <meta name="theme-color" content="#f8fafc" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Focus Disk" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icon-192.png" />
+  <link rel="icon" href="icon-192.png" />
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Pretendard Font -->
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" />
+  <style>
+    :root {
+      --frame-bg: #ffffff;
+      --frame-border: #e5e7eb;
+      --frame-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.04);
+      --disk-color: #ef4444;
+      --disk-glow: rgba(239, 68, 68, 0.25);
+    }
+
+    html, body {
+      overscroll-behavior-y: contain; /* 모바일 당겨서 새로고침 방지 */
+    }
+
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+      transition: background-color 0.4s ease;
+    }
+
+    /* 타이머 본체 스타일 */
+    .timer-housing {
+      background-color: var(--frame-bg);
+      border-color: var(--frame-border);
+      box-shadow: var(--frame-shadow);
+      transition: background-color 0.35s ease, border-color 0.35s ease, transform 0.2s ease, box-shadow 0.35s ease;
+    }
+
+    /* 입체적인 중앙 다이얼 노브 */
+    .center-knob {
+      filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.22));
+      transition: transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .center-knob:hover {
+      transform: scale(1.03);
+    }
+    .center-knob:active {
+      transform: scale(0.97);
+    }
+
+    /* 종료 시 화면 깜빡임(무소음 시각 알림) 애니메이션 */
+    @keyframes silentAlarmPulse {
+      0%, 100% {
+        box-shadow: 0 0 0 0px var(--disk-glow), var(--frame-shadow);
+      }
+      50% {
+        box-shadow: 0 0 0 22px var(--disk-glow), var(--frame-shadow);
+      }
+    }
+
+    @keyframes screenFlash {
+      0%, 100% {
+        background-color: #f8fafc;
+      }
+      50% {
+        background-color: #fee2e2;
+      }
+    }
+
+    .alarm-active-housing {
+      animation: silentAlarmPulse 1.2s infinite ease-in-out;
+    }
+
+    .alarm-active-bg {
+      animation: screenFlash 1.2s infinite ease-in-out;
+    }
+
+    /* 집중(전체화면) 모드에서 컨트롤 숨김 처리 */
+    body.focus-mode .hide-in-focus {
+      opacity: 0;
+      pointer-events: none;
+      transform: translateY(10px);
+    }
+    .hide-in-focus {
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    ::-webkit-scrollbar {
+      display: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col justify-between overflow-x-hidden">
+
+  <!-- 상단 헤더 & 설정 바 -->
+  <header class="w-full max-w-4xl mx-auto px-4 pt-3.5 pb-1.5 flex flex-wrap items-center justify-between gap-2 z-20">
+    <div class="flex items-center gap-2.5 hide-in-focus">
+      <div class="w-8 h-8 rounded-xl bg-rose-500 flex items-center justify-center text-white font-bold shadow-sm">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="9"></circle>
+          <path d="M12 7v5l3 2"></path>
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-sm sm:text-base font-extrabold tracking-tight text-slate-800 leading-none">무소음 비주얼 타이머</h1>
+        <p class="text-[11px] text-slate-500 font-semibold tracking-wide mt-0.5">FOCUS DISK · 60M</p>
+      </div>
+    </div>
+
+    <!-- 우측 퀵 옵션 컨트롤 -->
+    <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 ml-auto">
+      <!-- PWA 앱 설치 / 홈 화면 추가 버튼 -->
+      <button id="installAppBtn" title="스마트폰 홈 화면에 앱으로 설치"
+        class="hide-in-focus px-2.5 py-1.5 rounded-xl text-xs font-bold bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 active:scale-95 transition flex items-center gap-1 shadow-sm">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3v12m0 0l-4-4m4 4l4-4" />
+          <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2" />
+        </svg>
+        <span>앱 설치</span>
+      </button>
+
+      <!-- 디지털 시간 표시 토글 -->
+      <button id="toggleDigitalBtn" title="디지털 시간 표시 켜기/끄기"
+        class="hide-in-focus px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 active:scale-95 transition flex items-center gap-1 shadow-sm">
+        <svg class="w-3.5 h-3.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="6" width="20" height="12" rx="3"></rect>
+          <path d="M8 12h.01M12 12h.01M16 12h.01"></path>
+        </svg>
+        <span id="digitalToggleText">숫자 표시</span>
+      </button>
+
+      <!-- 무소음 / 차임벨 모드 토글 -->
+      <button id="toggleSoundModeBtn" title="종료 알림 방식 변경"
+        class="hide-in-focus px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 active:scale-95 transition flex items-center gap-1 shadow-sm">
+        <span id="soundModeIcon">🔕</span>
+        <span id="soundModeText">완전 무소음</span>
+      </button>
+
+      <!-- 미세 초침 소리 토글 -->
+      <button id="toggleTickBtn" title="초침 소리 켜기/끄기"
+        class="hide-in-focus p-1.5 rounded-xl text-xs font-semibold bg-white border border-slate-200 text-slate-400 hover:bg-slate-100 active:scale-95 transition shadow-sm"
+        aria-label="초침 소리 토글">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>
+        </svg>
+      </button>
+
+      <!-- 집중 모드 (전체화면 뷰) -->
+      <button id="toggleFocusBtn" title="집중 모드 (방해 요소 숨기기)"
+        class="px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 text-white hover:bg-slate-700 active:scale-95 transition flex items-center gap-1 shadow-sm">
+        <svg id="focusIconExpand" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"></path>
+        </svg>
+        <svg id="focusIconCompress" class="w-3.5 h-3.5 hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"></path>
+        </svg>
+        <span id="focusBtnText">집중 모드</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- 메인 비주얼 타이머 영역 -->
+  <main class="flex-1 flex flex-col items-center justify-center px-4 py-1.5 relative">
+    
+    <!-- 상태 안내 배지 & 화면 꺼짐 방지 토글 배지 -->
+    <div class="mb-2.5 flex flex-wrap items-center justify-center gap-2 max-w-full">
+      <div id="statusBadge" class="px-3 py-1 rounded-full text-xs font-semibold bg-white/95 border border-slate-200/80 text-slate-600 shadow-sm transition-all flex items-center gap-2">
+        <span id="statusDot" class="w-2 h-2 rounded-full bg-slate-400 shrink-0"></span>
+        <span id="statusMessage" class="truncate">다이얼을 드래그하거나 아래 버튼으로 시간을 설정하세요</span>
+      </div>
+
+      <!-- 화면 꺼짐 방지 (Screen Wake Lock) 상태 배지 버튼 -->
+      <button id="toggleWakeLockBtn" title="타이머 작동 중 화면 자동 꺼짐 방지 설정"
+        class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 active:scale-95 transition shadow-sm flex items-center gap-1.5">
+        <span id="wakeLockIndicator" class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+        <span id="wakeLockText">화면 꺼짐 방지 ON</span>
+      </button>
+    </div>
+
+    <!-- 타이머 본체 하우징 (둥근 사각형 미니멀 바디) -->
+    <div id="timerHousing" class="timer-housing relative w-[min(82vw,370px)] sm:w-[min(70vw,410px)] aspect-square rounded-[2.75rem] sm:rounded-[3.25rem] border-[6px] p-5 sm:p-7 flex items-center justify-center">
+      
+      <div class="w-full h-full rounded-full bg-white shadow-inner border border-slate-100 relative flex items-center justify-center overflow-hidden">
+        
+        <!-- SVG 아날로그 비주얼 다이얼 -->
+        <svg id="timerDialSvg" viewBox="0 0 400 400" class="w-full h-full cursor-grab active:cursor-grabbing touch-none">
+          <defs>
+            <!-- 중앙 노브 입체 그라데이션 -->
+            <radialGradient id="knobGrad" cx="35%" cy="30%" r="70%">
+              <stop offset="0%" stop-color="#4b5563" />
+              <stop offset="60%" stop-color="#1f2937" />
+              <stop offset="100%" stop-color="#111827" />
+            </radialGradient>
+            <!-- 부채꼴 원판 미세 음영 -->
+            <filter id="diskShadow" x="-10%" y="-10%" width="120%" height="120%">
+              <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000000" flood-opacity="0.12" />
+            </filter>
+          </defs>
+
+          <!-- 다이얼 배경 면 -->
+          <circle cx="200" cy="200" r="192" fill="#ffffff" />
+
+          <!-- 시그니처 컬러 섹터 원판 (남은 시간을 표시하는 부채꼴 영역) -->
+          <path id="sectorPath" d="" fill="var(--disk-color)" filter="url(#diskShadow)" />
+
+          <!-- 눈금 및 숫자 레이어 -->
+          <g id="dialTicksAndNumbers"></g>
+
+          <!-- 중앙 회전 노브 (Knob) -->
+          <g id="centerKnobGroup" class="center-knob" transform="translate(200, 200)">
+            <circle cx="0" cy="0" r="34" fill="#e5e7eb" />
+            <circle cx="0" cy="0" r="30" fill="url(#knobGrad)" />
+            <g id="knobHandle" transform="rotate(0)">
+              <rect x="-3.5" y="-25" width="7" height="50" rx="3.5" fill="#374151" stroke="#111827" stroke-width="1" />
+              <circle cx="0" cy="-18" r="2.5" fill="#ffffff" />
+            </g>
+          </g>
+        </svg>
+
+        <!-- 하단 디지털 보조 표시창 (토글 가능) -->
+        <div id="digitalReadoutBox" class="pointer-events-none absolute bottom-8 sm:bottom-10 px-3.5 py-1 rounded-xl bg-slate-900/85 backdrop-blur-sm text-white font-mono text-lg sm:text-xl font-bold tracking-wider shadow-md transition-all duration-200">
+          <span id="digitalTimeText">25:00</span>
+        </div>
+      </div>
+
+      <!-- 브랜드 로고 각인 (본체 하단 중앙) -->
+      <div class="absolute bottom-1.5 sm:bottom-2 left-1/2 -translate-x-1/2 text-[10px] font-bold tracking-[0.22em] opacity-40 pointer-events-none uppercase" id="brandStamp">
+        FOCUS DISK
+      </div>
+    </div>
+
+    <!-- 메인 재생 / 일시정지 / 초기화 컨트롤 버튼 -->
+    <div class="mt-4 flex items-center justify-center gap-3 z-10">
+      <button id="startPauseBtn"
+        class="px-7 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 active:scale-95 text-white font-bold text-sm sm:text-base shadow-lg shadow-slate-900/15 transition flex items-center gap-2 min-w-[136px] justify-center">
+        <svg id="playIcon" class="w-5 h-5 fill-current" viewBox="0 0 24 24">
+          <path d="M8 5v14l11-7z" />
+        </svg>
+        <svg id="pauseIcon" class="w-5 h-5 fill-current hidden" viewBox="0 0 24 24">
+          <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z" />
+        </svg>
+        <span id="startPauseText">시작하기</span>
+      </button>
+
+      <button id="resetBtn"
+        class="px-4 py-3 rounded-2xl bg-white hover:bg-slate-100 active:scale-95 text-slate-700 border border-slate-200 font-semibold text-sm sm:text-base shadow-sm transition flex items-center gap-1.5">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+          <path d="M3 3v5h5" />
+        </svg>
+        <span>초기화</span>
+      </button>
+
+      <!-- 알림 끄기 버튼 (종료 알람 울릴 때만 노출) -->
+      <button id="stopAlarmBtn"
+        class="hidden px-5 py-3 rounded-2xl bg-rose-600 hover:bg-rose-500 active:scale-95 text-white font-bold text-sm sm:text-base shadow-lg shadow-rose-600/30 animate-bounce flex items-center gap-1.5">
+        <span>알림 확인</span>
+      </button>
+    </div>
+  </main>
+
+  <!-- 하단 프리셋 & 컬러 커스터마이징 패널 -->
+  <footer class="hide-in-focus w-full max-w-2xl mx-auto px-4 pb-4 pt-1.5 flex flex-col gap-2.5 z-10">
+    
+    <!-- 빠른 시간 프리셋 버튼 -->
+    <div class="bg-white/90 backdrop-blur-md border border-slate-200/80 rounded-2xl p-2.5 shadow-sm">
+      <div class="flex items-center justify-between px-1.5 mb-2">
+        <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">빠른 시간 설정</span>
+        <span class="text-[11px] text-slate-400">다이얼을 직접 돌려도 설정됩니다</span>
+      </div>
+      <div class="grid grid-cols-7 gap-1.5">
+        <button data-mins="5" class="preset-btn py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95 transition">5분</button>
+        <button data-mins="10" class="preset-btn py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95 transition">10분</button>
+        <button data-mins="15" class="preset-btn py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95 transition">15분</button>
+        <button data-mins="25" class="preset-btn py-2 rounded-xl text-xs sm:text-sm font-bold bg-rose-50 border border-rose-200 text-rose-600 hover:bg-rose-100 active:scale-95 transition">25분</button>
+        <button data-mins="30" class="preset-btn py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95 transition">30분</button>
+        <button data-mins="45" class="preset-btn py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95 transition">45분</button>
+        <button data-mins="60" class="preset-btn py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 active:scale-95 transition">60분</button>
+      </div>
+    </div>
+
+    <!-- 바디 컬러 & 원판(디스크) 컬러 커스터마이저 -->
+    <div class="bg-white/90 backdrop-blur-md border border-slate-200/80 rounded-2xl px-4 py-2.5 shadow-sm flex flex-wrap items-center justify-between gap-3">
+      
+      <!-- 타이머 바디 프레임 컬러 -->
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-semibold text-slate-500">바디 컬러</span>
+        <div class="flex items-center gap-1.5" id="frameColorPicker">
+          <button data-frame="white" title="클래식 화이트" class="frame-swatch w-6 h-6 rounded-full bg-white border-2 border-slate-800 shadow-sm transition transform scale-110"></button>
+          <button data-frame="mint" title="파스텔 민트" class="frame-swatch w-6 h-6 rounded-full bg-[#d1fae5] border border-slate-300 shadow-sm transition hover:scale-110"></button>
+          <button data-frame="pink" title="소프트 핑크" class="frame-swatch w-6 h-6 rounded-full bg-[#fce7f3] border border-slate-300 shadow-sm transition hover:scale-110"></button>
+          <button data-frame="navy" title="차콜 네이비" class="frame-swatch w-6 h-6 rounded-full bg-[#1e293b] border border-slate-300 shadow-sm transition hover:scale-110"></button>
+        </div>
+      </div>
+
+      <!-- 원판(시간 섹터) 컬러 -->
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-semibold text-slate-500">원판 컬러</span>
+        <div class="flex items-center gap-1.5" id="diskColorPicker">
+          <button data-disk="#ef4444" data-glow="rgba(239, 68, 68, 0.28)" title="코랄 레드" class="disk-swatch w-6 h-6 rounded-full bg-[#ef4444] border-2 border-slate-800 shadow-sm transition transform scale-110"></button>
+          <button data-disk="#0ea5e9" data-glow="rgba(14, 165, 233, 0.28)" title="스카이 블루" class="disk-swatch w-6 h-6 rounded-full bg-[#0ea5e9] border border-white shadow-sm transition hover:scale-110"></button>
+          <button data-disk="#eab308" data-glow="rgba(234, 179, 8, 0.28)" title="머스타드 옐로우" class="disk-swatch w-6 h-6 rounded-full bg-[#eab308] border border-white shadow-sm transition hover:scale-110"></button>
+          <button data-disk="#10b981" data-glow="rgba(16, 185, 129, 0.28)" title="민트 그린" class="disk-swatch w-6 h-6 rounded-full bg-[#10b981] border border-white shadow-sm transition hover:scale-110"></button>
+        </div>
+      </div>
+
+      <!-- 차임벨 미리듣기 버튼 -->
+      <button id="testChimeBtn" class="text-xs font-semibold text-slate-500 hover:text-slate-800 flex items-center gap-1 transition ml-auto sm:ml-0">
+        <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+        </svg>
+        <span>알림음 테스트</span>
+      </button>
+    </div>
+  </footer>
+
+  <!-- PWA 홈 화면 추가 / 앱 설치 안내 모달 -->
+  <div id="installModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 relative animate-fadeIn">
+      <button id="closeInstallModalBtn" class="absolute top-4 right-4 p-1.5 rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition" aria-label="닫기">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 6L6 18M6 6l12 12" />
+        </svg>
+      </button>
+
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-11 h-11 rounded-2xl bg-rose-500 flex items-center justify-center text-white shadow-md">
+          <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+            <circle cx="12" cy="12" r="9"></circle>
+            <path d="M12 7v5l3 2"></path>
+          </svg>
+        </div>
+        <div>
+          <h2 class="text-base font-extrabold text-slate-800">앱처럼 홈 화면에 추가하기</h2>
+          <p class="text-xs text-slate-500">Focus Disk · 무소음 비주얼 타이머</p>
+        </div>
+      </div>
+
+      <p class="text-xs text-slate-600 leading-relaxed mb-4">
+        별도의 앱스토어 다운로드 없이 스마트폰 홈 화면에 추가하면 <strong>주소창 없는 전체 화면</strong>으로 쾌적하게 사용할 수 있습니다.
+      </p>
+
+      <!-- 안드로이드/크롬 원클릭 설치 영역 -->
+      <div id="nativeInstallSection" class="hidden mb-4">
+        <button id="triggerNativeInstallBtn" class="w-full py-3 rounded-2xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-sm shadow-md shadow-rose-500/20 transition">
+          지금 바로 홈 화면에 설치하기
+        </button>
+      </div>
+
+      <!-- iOS Safari & 수동 설치 가이드 -->
+      <div class="bg-slate-50 rounded-2xl p-3.5 border border-slate-200/70 space-y-2.5 text-xs text-slate-700">
+        <div class="font-bold text-slate-800 flex items-center gap-1.5">
+          <span>📱 아이폰 (Safari 브라우저)</span>
+        </div>
+        <ol class="list-decimal list-inside space-y-1 text-slate-600">
+          <li>하단 메뉴 막대의 <strong>공유 버튼 (네모 위 화살표)</strong>을 누릅니다.</li>
+          <li>메뉴를 아래로 내려 <strong>[홈 화면에 추가]</strong>를 선택합니다.</li>
+          <li>우측 상단 <strong>[추가]</strong>를 누르면 바탕화면에 아이콘이 생성됩니다.</li>
+        </ol>
+
+        <div class="border-t border-slate-200 pt-2.5 font-bold text-slate-800 flex items-center gap-1.5">
+          <span>🤖 갤럭시 / 안드로이드 (Chrome · 삼성인터넷)</span>
+        </div>
+        <p class="text-slate-600 leading-relaxed">
+          우측 상단 <strong>메뉴(⋮)</strong> 또는 하단 <strong>메뉴(≡)</strong>를 누른 뒤 <strong>[홈 화면에 추가]</strong> 또는 <strong>[앱 설치]</strong>를 선택하세요.
+        </p>
+      </div>
+
+      <button id="confirmInstallModalBtn" class="mt-4 w-full py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800 transition">
+        확인했습니다
+      </button>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * 무소음 비주얼 타이머 (Focus Disk)
+     * - 60분 아날로그 부채꼴(Sector) 실시간 렌더링 & 마우스/터치 다이얼 조작
+     * - Screen Wake Lock API 기반 작동 중 화면 꺼짐 자동 방지
+     * - 동적 Manifest & Service Worker 기반 PWA 설치/오프라인 대응 구조
+     */
+
+    // 상태 변수
+    const MAX_SECONDS = 3600; // 60분 = 3600초
+    let totalSeconds = 25 * 60; // 기본 설정 25분 (뽀모도로)
+    let remainingSeconds = totalSeconds;
+    let isRunning = false;
+    let isDragging = false;
+    let isAlarmActive = false;
+
+    // ===== 설정 저장(localStorage) =====
+    const PREFS_KEY = 'focusdisk.prefs.v1';
+    const PREFS_DEFAULT = { showDigital: true, soundMode: 'silent', tick: false, frame: 'white', disk: '#ef4444', glow: 'rgba(239, 68, 68, 0.28)' };
+    let prefs = { ...PREFS_DEFAULT };
+    try {
+      const rawPrefs = localStorage.getItem(PREFS_KEY);
+      if (rawPrefs) {
+        const parsed = JSON.parse(rawPrefs);
+        if (parsed && typeof parsed === 'object') prefs = { ...PREFS_DEFAULT, ...parsed };
+      }
+    } catch (e) {
+      // 저장된 설정을 읽지 못하면 기본값으로 시작
+    }
+    function savePrefs() {
+      try { localStorage.setItem(PREFS_KEY, JSON.stringify(prefs)); } catch (e) { /* 저장 불가 환경 무시 */ }
+    }
+
+    // 옵션 상태 (저장된 설정으로 복원)
+    let showDigital = prefs.showDigital !== false;
+    let soundMode = ['silent', 'vibrate', 'chime'].includes(prefs.soundMode) ? prefs.soundMode : 'silent';
+    let tickSoundEnabled = prefs.tick === true;
+    let focusMode = false;
+
+    // Screen Wake Lock (화면 꺼짐 방지) 상태
+    let wakeLockEnabled = true;
+    let wakeLockSentinel = null;
+
+    // PWA 설치 프롬프트 이벤트 저장
+    let deferredInstallPrompt = null;
+
+    // 타이머 정밀 보정용 타임스탬프
+    let lastTimestamp = null;
+    let lastWholeSecond = Math.ceil(remainingSeconds);
+    let animationFrameId = null;
+    let alarmIntervalId = null;
+
+    // DOM 요소 참조
+    const dialSvg = document.getElementById('timerDialSvg');
+    const sectorPath = document.getElementById('sectorPath');
+    const dialTicksGroup = document.getElementById('dialTicksAndNumbers');
+    const knobHandle = document.getElementById('knobHandle');
+    const timerHousing = document.getElementById('timerHousing');
+    const brandStamp = document.getElementById('brandStamp');
+
+    const digitalReadoutBox = document.getElementById('digitalReadoutBox');
+    const digitalTimeText = document.getElementById('digitalTimeText');
+    const toggleDigitalBtn = document.getElementById('toggleDigitalBtn');
+    const digitalToggleText = document.getElementById('digitalToggleText');
+
+    const startPauseBtn = document.getElementById('startPauseBtn');
+    const startPauseText = document.getElementById('startPauseText');
+    const playIcon = document.getElementById('playIcon');
+    const pauseIcon = document.getElementById('pauseIcon');
+    const resetBtn = document.getElementById('resetBtn');
+    const stopAlarmBtn = document.getElementById('stopAlarmBtn');
+
+    const statusDot = document.getElementById('statusDot');
+    const statusMessage = document.getElementById('statusMessage');
+
+    const toggleWakeLockBtn = document.getElementById('toggleWakeLockBtn');
+    const wakeLockIndicator = document.getElementById('wakeLockIndicator');
+    const wakeLockText = document.getElementById('wakeLockText');
+
+    const toggleSoundModeBtn = document.getElementById('toggleSoundModeBtn');
+    const soundModeIcon = document.getElementById('soundModeIcon');
+    const soundModeText = document.getElementById('soundModeText');
+    const toggleTickBtn = document.getElementById('toggleTickBtn');
+    const testChimeBtn = document.getElementById('testChimeBtn');
+    const toggleFocusBtn = document.getElementById('toggleFocusBtn');
+    const focusBtnText = document.getElementById('focusBtnText');
+    const focusIconExpand = document.getElementById('focusIconExpand');
+    const focusIconCompress = document.getElementById('focusIconCompress');
+
+    const installAppBtn = document.getElementById('installAppBtn');
+    const installModal = document.getElementById('installModal');
+    const closeInstallModalBtn = document.getElementById('closeInstallModalBtn');
+    const confirmInstallModalBtn = document.getElementById('confirmInstallModalBtn');
+    const nativeInstallSection = document.getElementById('nativeInstallSection');
+    const triggerNativeInstallBtn = document.getElementById('triggerNativeInstallBtn');
+
+    // =========================================================================
+    // 1. PWA: manifest.webmanifest + sw.js 연결 및 Service Worker 등록
+    // =========================================================================
+    function setupPWA() {
+      try {
+        if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+          navigator.serviceWorker.register('sw.js', { scope: './' }).catch(() => {
+            // 샌드박스/iframe 환경에서는 조용히 무시
+          });
+        }
+      } catch (err) {
+        console.warn('Service worker registration skipped:', err);
+      }
+    }
+
+    // Android / Chrome 설치 프롬프트 이벤트 캐치
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      nativeInstallSection.classList.remove('hidden');
+    });
+
+    // 설치 완료 시 처리
+    window.addEventListener('appinstalled', () => {
+      deferredInstallPrompt = null;
+      nativeInstallSection.classList.add('hidden');
+      installModal.classList.add('hidden');
+      installModal.classList.remove('flex');
+      updateStatus('ready', '홈 화면에 Focus Disk 앱이 설치되었습니다!');
+    });
+
+    // 설치 안내 모달 열기/닫기
+    installAppBtn.addEventListener('click', () => {
+      installModal.classList.remove('hidden');
+      installModal.classList.add('flex');
+    });
+
+    function closeInstallModal() {
+      installModal.classList.add('hidden');
+      installModal.classList.remove('flex');
+    }
+
+    closeInstallModalBtn.addEventListener('click', closeInstallModal);
+    confirmInstallModalBtn.addEventListener('click', closeInstallModal);
+    installModal.addEventListener('click', (e) => {
+      if (e.target === installModal) closeInstallModal();
+    });
+
+    triggerNativeInstallBtn.addEventListener('click', async () => {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      const { outcome } = await deferredInstallPrompt.userChoice;
+      if (outcome === 'accepted') {
+        deferredInstallPrompt = null;
+        closeInstallModal();
+      }
+    });
+
+    // =========================================================================
+    // 2. Screen Wake Lock (화면 꺼짐 방지) 제어 로직
+    // =========================================================================
+    function updateWakeLockBadgeUI(state) {
+      // state: 'on-active' | 'on-standby' | 'off' | 'unsupported'
+      toggleWakeLockBtn.className = 'px-2.5 py-1 rounded-full text-[11px] font-bold transition shadow-sm flex items-center gap-1.5 active:scale-95 border ';
+      wakeLockIndicator.className = 'w-1.5 h-1.5 rounded-full ';
+
+      if (state === 'on-active') {
+        toggleWakeLockBtn.className += 'bg-emerald-100 border-emerald-300 text-emerald-800';
+        wakeLockIndicator.className += 'bg-emerald-500 animate-pulse';
+        wakeLockText.textContent = '화면 꺼짐 방지 작동중';
+      } else if (state === 'on-standby') {
+        toggleWakeLockBtn.className += 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100';
+        wakeLockIndicator.className += 'bg-emerald-500';
+        wakeLockText.textContent = '화면 꺼짐 방지 ON';
+      } else if (state === 'unsupported') {
+        toggleWakeLockBtn.className += 'bg-slate-100 border-slate-200 text-slate-500';
+        wakeLockIndicator.className += 'bg-slate-400';
+        wakeLockText.textContent = '화면 유지 미지원 환경';
+      } else {
+        toggleWakeLockBtn.className += 'bg-slate-100 border-slate-200 text-slate-500 hover:bg-slate-200';
+        wakeLockIndicator.className += 'bg-slate-400';
+        wakeLockText.textContent = '화면 꺼짐 방지 OFF';
+      }
+    }
+
+    async function requestWakeLock() {
+      if (!wakeLockEnabled) return;
+      if (!('wakeLock' in navigator)) {
+        updateWakeLockBadgeUI('unsupported');
+        return;
+      }
+
+      try {
+        if (!wakeLockSentinel) {
+          wakeLockSentinel = await navigator.wakeLock.request('screen');
+          updateWakeLockBadgeUI('on-active');
+
+          wakeLockSentinel.addEventListener('release', () => {
+            wakeLockSentinel = null;
+            if (wakeLockEnabled && !isRunning) {
+              updateWakeLockBadgeUI('on-standby');
+            }
+          });
+        }
+      } catch (err) {
+        // iframe 정책이나 배터리 절약 모드로 차단될 경우 우아하게 폴백 처리
+        console.info('Wake Lock request restricted:', err.name);
+        updateWakeLockBadgeUI(wakeLockEnabled ? 'on-standby' : 'off');
+      }
+    }
+
+    async function releaseWakeLock() {
+      if (wakeLockSentinel) {
+        try {
+          await wakeLockSentinel.release();
+        } catch (err) {
+          // 무시
+        } finally {
+          wakeLockSentinel = null;
+        }
+      }
+      if (!('wakeLock' in navigator)) {
+        updateWakeLockBadgeUI('unsupported');
+      } else {
+        updateWakeLockBadgeUI(wakeLockEnabled ? 'on-standby' : 'off');
+      }
+    }
+
+    // 탭 전환 후 다시 돌아왔을 때 타이머가 실행 중이면 Wake Lock 재획득
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && isRunning && wakeLockEnabled) {
+        requestWakeLock();
+      }
+    });
+
+    // 화면 꺼짐 방지 토글 버튼 클릭
+    toggleWakeLockBtn.addEventListener('click', () => {
+      if (!('wakeLock' in navigator)) {
+        updateStatus('idle', '현재 브라우저 환경에서는 화면 꺼짐 방지가 제한됩니다');
+        return;
+      }
+      wakeLockEnabled = !wakeLockEnabled;
+      if (wakeLockEnabled) {
+        if (isRunning) {
+          requestWakeLock();
+        } else {
+          updateWakeLockBadgeUI('on-standby');
+        }
+        updateStatus('ready', '타이머 작동 중 화면이 꺼지지 않도록 유지합니다');
+      } else {
+        releaseWakeLock();
+        updateStatus('idle', '화면 꺼짐 방지가 해제되었습니다');
+      }
+    });
+
+    // =========================================================================
+    // 3. Web Audio API 사운드 효과 (차임벨 & 초침 소리)
+    // =========================================================================
+    let audioCtx = null;
+
+    function initAudioContext() {
+      if (!audioCtx) {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          audioCtx = new AudioContextClass();
+        }
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function playGentleChime() {
+      try {
+        initAudioContext();
+        if (!audioCtx) return;
+
+        const now = audioCtx.currentTime;
+        const frequencies = [523.25, 659.25, 783.99, 987.77];
+
+        frequencies.forEach((freq, idx) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.14);
+
+          gain.gain.setValueAtTime(0.0001, now + idx * 0.14);
+          gain.gain.exponentialRampToValueAtTime(0.14, now + idx * 0.14 + 0.04);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + idx * 0.14 + 1.6);
+
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+
+          osc.start(now + idx * 0.14);
+          osc.stop(now + idx * 0.14 + 1.7);
+        });
+      } catch (e) {
+        console.warn('Audio playback skipped:', e);
+      }
+    }
+
+    function playSubtleTick() {
+      if (!tickSoundEnabled) return;
+      try {
+        initAudioContext();
+        if (!audioCtx) return;
+
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(950, now);
+        osc.frequency.exponentialRampToValueAtTime(220, now + 0.025);
+
+        gain.gain.setValueAtTime(0.035, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.025);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start(now);
+        osc.stop(now + 0.03);
+      } catch (e) {
+        // 무시
+      }
+    }
+
+    // =========================================================================
+    // 3-1. 종료 알림 방식 (무소음 / 진동 / 차임벨)
+    // =========================================================================
+    const SOUND_MODES = {
+      silent: { icon: '🔕', text: '완전 무소음', next: 'vibrate' },
+      vibrate: { icon: '📳', text: '진동 알림', next: 'chime' },
+      chime: { icon: '🔔', text: '부드러운 차임벨', next: 'silent' }
+    };
+    const ALARM_VIBRATION = [420, 180, 420];
+    const vibrationSupported = typeof navigator.vibrate === 'function';
+
+    function vibrateOnce(pattern) {
+      if (!vibrationSupported) return false;
+      try {
+        return navigator.vibrate(pattern) === true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function applySoundModeUI() {
+      const mode = SOUND_MODES[soundMode] || SOUND_MODES.silent;
+      soundModeIcon.textContent = mode.icon;
+      soundModeText.textContent = mode.text;
+      toggleSoundModeBtn.title = vibrationSupported
+        ? '종료 알림 방식 변경 (누를 때마다 무소음 → 진동 → 차임벨)'
+        : '종료 알림 방식 변경 (이 브라우저는 진동 미지원) · 누를 때마다 무소음 → 차임벨';
+    }
+
+    function setSoundMode(mode, announce) {
+      soundMode = SOUND_MODES[mode] ? mode : 'silent';
+      prefs.soundMode = soundMode;
+      savePrefs();
+      applySoundModeUI();
+      if (announce) updateStatus('ready', `종료 알림: ${SOUND_MODES[soundMode].text}`);
+    }
+
+    // =========================================================================
+    // 4. 아날로그 비주얼 다이얼 렌더링 & 드래그 인터랙션
+    // =========================================================================
+    function buildDialFace() {
+      const cx = 200;
+      const cy = 200;
+      const outerRadius = 184;
+      const numberRadius = 148;
+
+      let markup = '';
+
+      for (let i = 0; i < 60; i++) {
+        const angleDeg = i * 6;
+        const angleRad = ((angleDeg - 90) * Math.PI) / 180;
+        const isMajor = i % 5 === 0;
+
+        const innerR = isMajor ? outerRadius - 14 : outerRadius - 7;
+        const x1 = cx + innerR * Math.cos(angleRad);
+        const y1 = cy + innerR * Math.sin(angleRad);
+        const x2 = cx + outerRadius * Math.cos(angleRad);
+        const y2 = cy + outerRadius * Math.sin(angleRad);
+
+        markup += `<line x1="${x1.toFixed(2)}" y1="${y1.toFixed(2)}" x2="${x2.toFixed(2)}" y2="${y2.toFixed(2)}"
+          stroke="${isMajor ? '#111827' : '#9ca3af'}"
+          stroke-width="${isMajor ? '2.6' : '1.3'}"
+          stroke-linecap="round" />`;
+
+        if (isMajor) {
+          const labelValue = i === 0 ? '0' : String(i);
+          const nx = cx + numberRadius * Math.cos(angleRad);
+          const ny = cy + numberRadius * Math.sin(angleRad);
+
+          markup += `<text x="${nx.toFixed(2)}" y="${ny.toFixed(2)}"
+            fill="#1f2937"
+            font-size="${i === 0 ? '19' : '17'}"
+            font-weight="800"
+            text-anchor="middle"
+            dominant-baseline="central"
+            style="font-variant-numeric: tabular-nums;">${labelValue}</text>`;
+        }
+      }
+
+      dialTicksGroup.innerHTML = markup;
+    }
+
+    function renderVisualDial() {
+      const clamped = Math.max(0, Math.min(MAX_SECONDS, remainingSeconds));
+      const ratio = clamped / MAX_SECONDS;
+      const angleDeg = ratio * 360;
+
+      knobHandle.setAttribute('transform', `rotate(${angleDeg.toFixed(2)})`);
+
+      const cx = 200;
+      const cy = 200;
+      const r = 184;
+
+      if (clamped <= 0) {
+        sectorPath.setAttribute('d', '');
+      } else if (clamped >= MAX_SECONDS) {
+        const d = [
+          `M ${cx} ${cy - r}`,
+          `A ${r} ${r} 0 1 1 ${cx} ${cy + r}`,
+          `A ${r} ${r} 0 1 1 ${cx} ${cy - r}`,
+          'Z'
+        ].join(' ');
+        sectorPath.setAttribute('d', d);
+      } else {
+        const endRad = ((angleDeg - 90) * Math.PI) / 180;
+        const endX = cx + r * Math.cos(endRad);
+        const endY = cy + r * Math.sin(endRad);
+        const largeArcFlag = angleDeg > 180 ? 1 : 0;
+
+        const d = [
+          `M ${cx} ${cy}`,
+          `L ${cx} ${cy - r}`,
+          `A ${r} ${r} 0 ${largeArcFlag} 1 ${endX.toFixed(2)} ${endY.toFixed(2)}`,
+          'Z'
+        ].join(' ');
+        sectorPath.setAttribute('d', d);
+      }
+
+      const displaySec = Math.ceil(clamped);
+      const mins = Math.floor(displaySec / 60);
+      const secs = displaySec % 60;
+      digitalTimeText.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }
+
+    function updateTimeFromPointer(clientX, clientY) {
+      const rect = dialSvg.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+
+      const dx = clientX - centerX;
+      const dy = clientY - centerY;
+
+      let deg = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
+      if (deg < 0) deg += 360;
+
+      let minutes = Math.round(deg / 6);
+      if (minutes === 60) minutes = 60;
+      if (minutes === 0 && deg > 350) minutes = 60;
+
+      const newSeconds = minutes * 60;
+      if (newSeconds !== totalSeconds || remainingSeconds !== newSeconds) {
+        totalSeconds = newSeconds;
+        remainingSeconds = newSeconds;
+        lastWholeSecond = Math.ceil(remainingSeconds);
+        renderVisualDial();
+      }
+    }
+
+    function handlePointerDown(e) {
+      if (isAlarmActive) stopAlarm();
+      if (isRunning) pauseTimer();
+
+      initAudioContext();
+      isDragging = true;
+
+      const point = e.touches ? e.touches[0] : e;
+      updateTimeFromPointer(point.clientX, point.clientY);
+      updateStatus('setting', '원하는 분(Minute) 위치까지 다이얼을 돌려주세요');
+    }
+
+    function handlePointerMove(e) {
+      if (!isDragging) return;
+      if (e.cancelable) e.preventDefault();
+      const point = e.touches ? e.touches[0] : e;
+      updateTimeFromPointer(point.clientX, point.clientY);
+    }
+
+    function handlePointerUp() {
+      if (!isDragging) return;
+      isDragging = false;
+      if (remainingSeconds > 0) {
+        updateStatus('ready', `${Math.round(remainingSeconds / 60)}분 설정 완료 — 시작하기를 누르세요`);
+      } else {
+        updateStatus('idle', '다이얼을 드래그하거나 아래 버튼으로 시간을 설정하세요');
+      }
+    }
+
+    dialSvg.addEventListener('mousedown', handlePointerDown);
+    window.addEventListener('mousemove', handlePointerMove);
+    window.addEventListener('mouseup', handlePointerUp);
+
+    dialSvg.addEventListener('touchstart', handlePointerDown, { passive: false });
+    window.addEventListener('touchmove', handlePointerMove, { passive: false });
+    window.addEventListener('touchend', handlePointerUp);
+
+    // =========================================================================
+    // 5. 타이머 실행 / 일시정지 / 초기화 / 완료 제어
+    // =========================================================================
+    function tickLoop(timestamp) {
+      if (!isRunning) return;
+
+      if (lastTimestamp === null) {
+        lastTimestamp = timestamp;
+      }
+
+      const deltaSec = (timestamp - lastTimestamp) / 1000;
+      lastTimestamp = timestamp;
+
+      remainingSeconds = Math.max(0, remainingSeconds - deltaSec);
+      renderVisualDial();
+
+      const currentWhole = Math.ceil(remainingSeconds);
+      if (currentWhole < lastWholeSecond && currentWhole > 0) {
+        playSubtleTick();
+        lastWholeSecond = currentWhole;
+      }
+
+      if (remainingSeconds <= 0) {
+        completeTimer();
+        return;
+      }
+
+      animationFrameId = requestAnimationFrame(tickLoop);
+    }
+
+    function startTimer() {
+      if (isAlarmActive) stopAlarm();
+      if (remainingSeconds <= 0) {
+        remainingSeconds = totalSeconds > 0 ? totalSeconds : 25 * 60;
+        if (totalSeconds === 0) totalSeconds = remainingSeconds;
+        renderVisualDial();
+      }
+
+      initAudioContext();
+      isRunning = true;
+      lastTimestamp = null;
+      lastWholeSecond = Math.ceil(remainingSeconds);
+
+      // 타이머 실행 시 화면 꺼짐 방지 활성화
+      requestWakeLock();
+
+      startPauseText.textContent = '일시정지';
+      playIcon.classList.add('hidden');
+      pauseIcon.classList.remove('hidden');
+      startPauseBtn.classList.replace('bg-slate-900', 'bg-amber-600');
+      startPauseBtn.classList.replace('hover:bg-slate-800', 'hover:bg-amber-500');
+
+      updateStatus('running', '집중 시간 진행 중...');
+      animationFrameId = requestAnimationFrame(tickLoop);
+    }
+
+    function pauseTimer() {
+      isRunning = false;
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+        animationFrameId = null;
+      }
+
+      // 일시정지 시 화면 꺼짐 방지 해제
+      releaseWakeLock();
+
+      startPauseText.textContent = '계속하기';
+      playIcon.classList.remove('hidden');
+      pauseIcon.classList.add('hidden');
+      startPauseBtn.classList.replace('bg-amber-600', 'bg-slate-900');
+      startPauseBtn.classList.replace('hover:bg-amber-500', 'hover:bg-slate-800');
+
+      updateStatus('paused', '일시 정지됨');
+    }
+
+    function resetTimer() {
+      stopAlarm();
+      pauseTimer();
+      remainingSeconds = totalSeconds;
+      lastWholeSecond = Math.ceil(remainingSeconds);
+      renderVisualDial();
+
+      startPauseText.textContent = '시작하기';
+      updateStatus('ready', '시간이 초기화되었습니다');
+    }
+
+    function completeTimer() {
+      isRunning = false;
+      remainingSeconds = 0;
+      renderVisualDial();
+
+      // 종료 시 화면 꺼짐 방지 해제
+      releaseWakeLock();
+
+      startPauseText.textContent = '다시 시작';
+      playIcon.classList.remove('hidden');
+      pauseIcon.classList.add('hidden');
+      startPauseBtn.classList.replace('bg-amber-600', 'bg-slate-900');
+      startPauseBtn.classList.replace('hover:bg-amber-500', 'hover:bg-slate-800');
+
+      isAlarmActive = true;
+      timerHousing.classList.add('alarm-active-housing');
+      document.body.classList.add('alarm-active-bg');
+      stopAlarmBtn.classList.remove('hidden');
+
+      updateStatus('finished', '설정한 시간이 모두 종료되었습니다!');
+
+      if (soundMode === 'chime') {
+        playGentleChime();
+        alarmIntervalId = setInterval(() => {
+          if (isAlarmActive && soundMode === 'chime') {
+            playGentleChime();
+          }
+        }, 3500);
+      } else if (soundMode === 'vibrate') {
+        const vibrated = vibrateOnce(ALARM_VIBRATION);
+        if (!vibrated) {
+          updateStatus('finished', '시간 종료! 이 브라우저에서는 진동을 지원하지 않아 무소음으로 알려드려요');
+        } else {
+          updateStatus('finished', '시간 종료! 진동으로 알려드리는 중이에요');
+        }
+        alarmIntervalId = setInterval(() => {
+          if (isAlarmActive && soundMode === 'vibrate') {
+            vibrateOnce(ALARM_VIBRATION);
+          }
+        }, 3000);
+      }
+    }
+
+    function stopAlarm() {
+      isAlarmActive = false;
+      timerHousing.classList.remove('alarm-active-housing');
+      document.body.classList.remove('alarm-active-bg');
+      stopAlarmBtn.classList.add('hidden');
+      vibrateOnce(0);
+
+      if (alarmIntervalId) {
+        clearInterval(alarmIntervalId);
+        alarmIntervalId = null;
+      }
+    }
+
+    function updateStatus(type, text) {
+      statusMessage.textContent = text;
+      statusDot.className = 'w-2 h-2 rounded-full transition-colors shrink-0';
+
+      switch (type) {
+        case 'running':
+          statusDot.classList.add('bg-emerald-500', 'animate-ping');
+          break;
+        case 'paused':
+          statusDot.classList.add('bg-amber-500');
+          break;
+        case 'finished':
+          statusDot.classList.add('bg-rose-500', 'animate-ping');
+          break;
+        case 'ready':
+        case 'setting':
+          statusDot.classList.add('bg-sky-500');
+          break;
+        default:
+          statusDot.classList.add('bg-slate-400');
+      }
+    }
+
+    // 컨트롤 이벤트 바인딩
+    startPauseBtn.addEventListener('click', () => {
+      if (isRunning) pauseTimer();
+      else startTimer();
+    });
+
+    resetBtn.addEventListener('click', resetTimer);
+    stopAlarmBtn.addEventListener('click', () => {
+      stopAlarm();
+      updateStatus('idle', '알림이 해제되었습니다');
+    });
+
+    document.querySelectorAll('.preset-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        if (isAlarmActive) stopAlarm();
+        if (isRunning) pauseTimer();
+
+        const mins = parseInt(btn.dataset.mins, 10);
+        totalSeconds = mins * 60;
+        remainingSeconds = totalSeconds;
+        lastWholeSecond = Math.ceil(remainingSeconds);
+        renderVisualDial();
+
+        startPauseText.textContent = '시작하기';
+        updateStatus('ready', `${mins}분 프리셋 선택됨 — 시작하기를 누르세요`);
+      });
+    });
+
+    function applyDigitalUI() {
+      if (showDigital) {
+        digitalReadoutBox.classList.remove('opacity-0', 'scale-90');
+        digitalToggleText.textContent = '숫자 표시';
+        toggleDigitalBtn.classList.remove('opacity-60');
+      } else {
+        digitalReadoutBox.classList.add('opacity-0', 'scale-90');
+        digitalToggleText.textContent = '숫자 숨김';
+        toggleDigitalBtn.classList.add('opacity-60');
+      }
+    }
+
+    toggleDigitalBtn.addEventListener('click', () => {
+      showDigital = !showDigital;
+      prefs.showDigital = showDigital;
+      savePrefs();
+      applyDigitalUI();
+    });
+
+    toggleSoundModeBtn.addEventListener('click', () => {
+      initAudioContext();
+      const next = (SOUND_MODES[soundMode] || SOUND_MODES.silent).next;
+      setSoundMode(next, true);
+      if (soundMode === 'chime') playGentleChime();
+      if (soundMode === 'vibrate' && !vibrateOnce([90])) {
+        updateStatus('ready', '이 브라우저에서는 진동이 동작하지 않아 무소음처럼 쓰게 돼요');
+      }
+    });
+
+    function applyTickUI() {
+      if (tickSoundEnabled) {
+        toggleTickBtn.classList.remove('text-slate-400');
+        toggleTickBtn.classList.add('text-slate-800', 'bg-slate-100', 'border-slate-300');
+      } else {
+        toggleTickBtn.classList.add('text-slate-400');
+        toggleTickBtn.classList.remove('text-slate-800', 'bg-slate-100', 'border-slate-300');
+      }
+    }
+
+    toggleTickBtn.addEventListener('click', () => {
+      initAudioContext();
+      tickSoundEnabled = !tickSoundEnabled;
+      prefs.tick = tickSoundEnabled;
+      savePrefs();
+      applyTickUI();
+      if (tickSoundEnabled) playSubtleTick();
+    });
+
+    testChimeBtn.addEventListener('click', () => {
+      if (soundMode === 'vibrate') {
+        if (!vibrateOnce(ALARM_VIBRATION)) {
+          updateStatus('ready', '이 브라우저에서는 진동이 동작하지 않아요');
+        }
+        return;
+      }
+      playGentleChime();
+    });
+
+    toggleFocusBtn.addEventListener('click', () => {
+      focusMode = !focusMode;
+      document.body.classList.toggle('focus-mode', focusMode);
+      if (focusMode) {
+        focusBtnText.textContent = '메뉴 보기';
+        focusIconExpand.classList.add('hidden');
+        focusIconCompress.classList.remove('hidden');
+      } else {
+        focusBtnText.textContent = '집중 모드';
+        focusIconExpand.classList.remove('hidden');
+        focusIconCompress.classList.add('hidden');
+      }
+    });
+
+    // 바디 프레임 테마 변경
+    const frameThemes = {
+      white: { bg: '#ffffff', border: '#e5e7eb', stamp: '#334155' },
+      mint: { bg: '#d1fae5', border: '#a7f3d0', stamp: '#065f46' },
+      pink: { bg: '#fce7f3', border: '#fbcfe8', stamp: '#9d174d' },
+      navy: { bg: '#1e293b', border: '#0f172a', stamp: '#f8fafc' }
+    };
+
+    document.querySelectorAll('.frame-swatch').forEach((swatch) => {
+      swatch.addEventListener('click', () => {
+        const key = swatch.dataset.frame;
+        if (!frameThemes[key]) return;
+        applyFrame(key);
+        prefs.frame = key;
+        savePrefs();
+      });
+    });
+
+    function applyFrame(key) {
+      const theme = frameThemes[key] || frameThemes.white;
+      const picked = frameThemes[key] ? key : 'white';
+
+      document.documentElement.style.setProperty('--frame-bg', theme.bg);
+      document.documentElement.style.setProperty('--frame-border', theme.border);
+      brandStamp.style.color = theme.stamp;
+
+      document.querySelectorAll('.frame-swatch').forEach((s) => {
+        const on = s.dataset.frame === picked;
+        s.classList.toggle('border-2', on);
+        s.classList.toggle('border-slate-800', on);
+        s.classList.toggle('scale-110', on);
+        s.classList.toggle('border', !on);
+        s.classList.toggle('border-slate-300', !on);
+      });
+    }
+
+    // 컬러 원판(디스크) 색상 변경
+    document.querySelectorAll('.disk-swatch').forEach((swatch) => {
+      swatch.addEventListener('click', () => {
+        applyDisk(swatch.dataset.disk, swatch.dataset.glow);
+        prefs.disk = swatch.dataset.disk;
+        prefs.glow = swatch.dataset.glow;
+        savePrefs();
+      });
+    });
+
+    function applyDisk(color, glow) {
+      if (!color) color = PREFS_DEFAULT.disk;
+      if (!glow) glow = PREFS_DEFAULT.glow;
+
+      document.documentElement.style.setProperty('--disk-color', color);
+      document.documentElement.style.setProperty('--disk-glow', glow);
+
+      let matched = false;
+      document.querySelectorAll('.disk-swatch').forEach((s) => {
+        const on = s.dataset.disk.toLowerCase() === String(color).toLowerCase();
+        if (on) matched = true;
+        s.classList.toggle('border-2', on);
+        s.classList.toggle('border-slate-800', on);
+        s.classList.toggle('scale-110', on);
+        s.classList.toggle('border', !on);
+        s.classList.toggle('border-white', !on);
+      });
+      // 저장된 색상이 프리셋에 없으면(직접 지정한 값) 아무 스와치도 선택 표시하지 않음
+      return matched;
+    }
+
+    // 스페이스바 시작/일시정지 단축키
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && document.activeElement.tagName !== 'BUTTON') {
+        e.preventDefault();
+        if (isRunning) pauseTimer();
+        else startTimer();
+      }
+    });
+
+    // 초기화 실행 (DOM 파싱 직후 바로 그려서 첫 화면이 빨리 뜨게 함)
+    function initApp() {
+      setupPWA();
+      buildDialFace();
+      renderVisualDial();
+      applyFrame(prefs.frame);
+      applyDisk(prefs.disk, prefs.glow);
+      applyDigitalUI();
+      applySoundModeUI();
+      applyTickUI();
+      // 이미 홈 화면 앱으로 열린 경우 설치 버튼은 숨깁니다.
+      const standalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+      if (standalone) installAppBtn.classList.add('hidden');
+      if (!('wakeLock' in navigator)) {
+        updateWakeLockBadgeUI('unsupported');
+      } else {
+        updateWakeLockBadgeUI('on-standby');
+      }
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initApp, { once: true });
+    } else {
+      initApp();
+    }
+  </script>
+</body>
+</html>
