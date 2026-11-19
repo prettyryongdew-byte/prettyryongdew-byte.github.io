@@ -79,7 +79,7 @@ function blank(){if(!confirm('모든 입력을 지우고 빈 상태로 시작할
 async function shot(ai){let sm=null;try{sm=await window.claude.use('sample')}catch(e){}
 if(!sm){alert('이 화면에서는 캡처 읽기를 쓸 수 없어요. 표에 직접 입력해 주세요.');return}
 if(!S.shotOk){if(!confirm('캡처 이미지는 숫자를 읽기 위해서만 Claude로 전송되고 이 페이지에 저장되지 않아요. 계좌번호와 이름은 가린 뒤 올려 주세요. 계속할까요?'))return;S.shotOk=1;save()}
-const fi=document.createElement('input');fi.type='file';fi.accept='image/*';
+const fi=document.createElement('input');fi.type='file';fi.accept='image/*';fi.style.cssText='position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0';document.body.appendChild(fi);
 fi.onchange=async()=>{const file=fi.files[0];if(!file)return;
 try{const r=await sm.json('증권사 앱 보유종목 캡처입니다. 보이는 종목만 읽어 JSON 배열로만 답하세요: [{"name":"종목명","qty":보유수량,"avg":평균매수가,"price":현재가,"cur":"KRW 또는 USD"}]. 보이지 않는 값은 0으로 두고 추측하지 마세요. 계좌번호·이름 등 개인정보는 무시하세요.',{images:[file]});
 const L=(Array.isArray(r)?r:[]).filter(x=>x&&x.name);
@@ -104,15 +104,15 @@ const B=(Array.isArray(d.others)?d.others:[]).filter(x=>x).map(x=>({id:cl(x.id)|
 const H=(Array.isArray(d.hist)?d.hist:[]).filter(h=>h&&/^\d{4}-\d{2}$/.test(h.m||'')).map(h=>({o:cl(h.o),m:h.m,net:+h.net||0,val:+h.val||0,cost:+h.cost||0}));
 const s=d.sim||{};return{owner:cl(d.owner)||'전체',goal:+d.goal||0,fx:+d.fx||1400,view:d.view==='all'?'all':'acc',accounts:A,others:B,hist:H,sim:{monthly:+s.monthly||0,g:+s.g||0,y:+s.y||0,years:+s.years||20,reinvest:s.reinvest?1:0}}}
 function expJSON(){const o={app:'asset-dashboard',v:2,savedAt:new Date().toISOString(),data:S};const b=new Blob([JSON.stringify(o,null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='자산대시보드-백업-'+ld()+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}
-function impJSON(){const fi=document.createElement('input');fi.type='file';fi.accept='.json,application/json';
-fi.onchange=()=>{const f=fi.files[0];if(!f)return;if(f.size>4e6){alert('파일이 너무 커요(4MB 초과). 자산 대시보드 백업 파일이 맞는지 확인해 주세요.');return}const rd=new FileReader();
+function impJSON(){document.querySelectorAll('input[data-tmp="json"]').forEach(x=>x.remove());const fi=document.createElement('input');fi.type='file';fi.accept='.json,application/json';fi.dataset.tmp='json';fi.style.cssText='position:fixed;left:-9999px;top:0;width:1px;height:1px;opacity:0';document.body.appendChild(fi);
+fi.onchange=()=>{const f=fi.files[0];if(!f){fi.remove();return}if(f.size>4e6){alert('파일이 너무 커요(4MB 초과). 자산 대시보드 백업 파일이 맞는지 확인해 주세요.');return}const rd=new FileReader();
 rd.onerror=()=>alert('파일을 읽지 못했어요. 다시 시도해 주세요.');
 rd.onload=()=>{let o;try{o=JSON.parse(String(rd.result).replace(/^\uFEFF/,''))}catch(e){alert('JSON 파일을 읽지 못했어요. 백업할 때 받은 파일 그대로인지 확인해 주세요.');return}
 const d=o&&o.data?o.data:o;if(!d||!Array.isArray(d.accounts)||!Array.isArray(d.others)){alert('자산 대시보드 백업 파일이 아니에요.');return}
 const when=o&&o.savedAt?String(o.savedAt).slice(0,10):'날짜 없음';
 if(!confirm('백업 파일('+when+')의 내용으로 지금 데이터를 바꿀까요?\n계좌 '+d.accounts.length+'개 · 기타 항목 '+d.others.length+'개 · 월별 기록 '+(Array.isArray(d.hist)?d.hist.length:0)+'건\n지금 기기에 있던 내용은 사라집니다.'))return;
 S=clean(d);fix();save();XC='';render();alert('백업 파일을 불러왔어요.')};
-rd.readAsText(f,'utf-8')};
+rd.readAsText(f,'utf-8');fi.remove()};
 fi.click()}
 function reset(){if(confirm('예시 데이터로 되돌릴까요? 입력한 내용이 사라집니다.')){S=clone(SAMPLE);fix();save();render()}}
 function apply(ai){if(!confirm('다음 자동매수분을 보유 수량과 평균매수가에 반영할까요?'))return;S.accounts[ai].holdings.forEach(h=>{const n=ns(h);if(n>0){h.avg=(h.avg*h.qty+n*h.price)/(h.qty+n);h.qty+=n}h.ovr=null});save();render()}
